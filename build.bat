@@ -7,11 +7,31 @@ REM Architectures: amd64, arm64
 
 REM Application info
 set APP_NAME=elsa
-set VERSION=0.2.0
+
+REM Extract version from main.go using findstr
+echo Extracting version from main.go...
+for /f "tokens=*" %%i in ('findstr /C:"version = " main.go') do (
+    set VERSION_LINE=%%i
+    REM Extract version from the line: version = "x.x.x"
+    for /f "tokens=3 delims= " %%j in ("!VERSION_LINE!") do (
+        set VERSION=%%j
+        REM Remove quotes
+        set VERSION=!VERSION:"=!
+    )
+)
+
+REM Fallback if extraction fails
+if "%VERSION%"=="" (
+    echo Warning: Could not extract version, using fallback
+    set VERSION=dev-version
+)
+
 set BUILD_DIR=build
 
 echo Building Elsa CLI v%VERSION% for multiple platforms
 echo =================================================
+echo Version: %VERSION%
+echo.
 
 REM Create build directory
 if not exist %BUILD_DIR% mkdir %BUILD_DIR%
