@@ -7,7 +7,7 @@ REM Architectures: amd64, arm64
 
 REM Application info
 set APP_NAME=elsa
-set VERSION=1.0.0
+set VERSION=0.2.0
 set BUILD_DIR=build
 
 echo Building Elsa CLI v%VERSION% for multiple platforms
