@@ -43,7 +43,7 @@ func SetVersionInfo(v string) {
 }
 
 func customVersionTemplate() string {
-	return fmt.Sprintf("ELSA v%s (CLI)\n%s %s\nLearn more at: https://risoftinc.com\n",
+	return fmt.Sprintf("ELSA v%s (CLI)\ngo version %s %s\nLearn more at: https://risoftinc.com\n",
 		version, goVersion, platform,
 	)
 }
