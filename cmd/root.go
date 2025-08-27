@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"runtime"
 
+	"github.com/risoftinc/elsa/cmd/migrate"
 	"github.com/spf13/cobra"
 )
 
@@ -20,6 +21,7 @@ var (
 			fmt.Println(getBanner(version) + `
 		
 Examples:
+  elsa migration   		Database migration commands
   elsa --version		Show version information
   elsa --help			Show help information`)
 		},
@@ -32,6 +34,8 @@ func Execute() error {
 }
 
 func init() {
+	// Add migration command
+	rootCmd.AddCommand(migrate.MigrateCmd())
 }
 
 // SetVersionInfo sets the version information for the application
