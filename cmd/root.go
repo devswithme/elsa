@@ -20,10 +20,18 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			fmt.Println(getBanner(version) + `
 		
-Examples:
-  elsa migration   		Database migration commands
-  elsa --version		Show version information
-  elsa --help			Show help information`)
+Usage:
+  elsa [flags]
+  elsa [command]
+
+Available Commands:
+  completion  Generate the autocompletion script for the specified shell
+  help        Help about any command
+  migration   Database migration commands
+
+Flags:
+  -h, --help      help for elsa
+  -v, --version   version for elsa`)
 		},
 	}
 )
