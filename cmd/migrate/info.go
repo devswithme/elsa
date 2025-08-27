@@ -17,10 +17,14 @@ var (
 Examples:
   elsa migration info                    # Show info of all migrations
   elsa migration info ddl               # Show info of DDL migrations
-  elsa migration info dml               # Show info of DML migrations`,
+  elsa migration info dml               # Show info of DML migrations
+  elsa migration info ddl --path custom/migrations  # Use custom migration path`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runInfo,
 	}
+
+	infoCustomPath string
+	infoConnection string
 )
 
 func runInfo(cmd *cobra.Command, args []string) error {
@@ -49,12 +53,17 @@ func runInfo(cmd *cobra.Command, args []string) error {
 	return showMigrationInfo(migrationType)
 }
 
+func init() {
+	infoCmd.Flags().StringVarP(&infoCustomPath, "path", "p", "", "Custom migration path")
+	infoCmd.Flags().StringVarP(&infoConnection, "connection", "c", "", "Database connection string")
+}
+
 func showMigrationInfo(migrationType string) error {
 	fmt.Printf("\n🔧 %s Migrations Information:\n", strings.ToUpper(migrationType))
 	fmt.Printf("%s\n", strings.Repeat("-", 40))
 
 	// Get available migrations
-	migrations, err := getAvailableMigrations(migrationType)
+	migrations, err := GetAvailableMigrationsWithPath(migrationType, infoCustomPath)
 	if err != nil {
 		return fmt.Errorf("failed to get available migrations: %v", err)
 	}
@@ -64,10 +73,16 @@ func showMigrationInfo(migrationType string) error {
 		return nil
 	}
 
-	// Get applied migrations from database
-	appliedMigrations, err := getAppliedMigrations(migrationType)
-	if err != nil {
-		return fmt.Errorf("failed to get applied migrations: %v", err)
+	// Get applied migrations from database (optional, only if connection is provided)
+	var appliedMigrations []string
+	var err2 error
+
+	// Try to get applied migrations if connection is provided
+	appliedMigrations, err2 = getAppliedMigrationsWithConnection(migrationType, infoConnection)
+	if err2 != nil {
+		fmt.Printf("⚠️  Warning: Could not connect to database: %v\n", err2)
+		fmt.Printf("   Showing file-based information only\n")
+		appliedMigrations = []string{} // Empty slice to show all as pending
 	}
 
 	// Create applied map for quick lookup

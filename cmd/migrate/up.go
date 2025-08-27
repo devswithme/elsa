@@ -3,11 +3,11 @@ package migrate
 import (
 	"fmt"
 	"os"
-	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/risoftinc/elsa/internal/database"
 	"github.com/spf13/cobra"
 )
 
@@ -21,18 +21,23 @@ Examples:
   elsa migration up ddl                    # Apply all DDL migrations
   elsa migration up dml                    # Apply all DML migrations
   elsa migration up ddl --step 2           # Apply 2 DDL migrations
-  elsa migration up ddl --to 00002         # Apply DDL migrations up to ID 00002`,
+  elsa migration up ddl --to 00002         # Apply DDL migrations up to ID 00002
+  elsa migration up ddl --path custom/migrations  # Use custom migration path`,
 		Args: cobra.ExactArgs(1),
 		RunE: runUp,
 	}
 
-	stepCount   int
-	toMigration string
+	upStepCount   int
+	upToMigration string
+	upCustomPath  string
+	upConnection  string
 )
 
 func init() {
-	upCmd.Flags().IntVarP(&stepCount, "step", "s", 0, "Number of migrations to apply")
-	upCmd.Flags().StringVarP(&toMigration, "to", "t", "", "Apply migrations up to specific ID")
+	upCmd.Flags().IntVarP(&upStepCount, "step", "s", 0, "Number of migrations to apply")
+	upCmd.Flags().StringVarP(&upToMigration, "to", "t", "", "Apply migrations up to specific ID")
+	upCmd.Flags().StringVarP(&upCustomPath, "path", "p", "", "Custom migration path")
+	upCmd.Flags().StringVarP(&upConnection, "connection", "c", "", "Direct database connection string (e.g., mysql://user:pass@host:port/db)")
 }
 
 func runUp(cmd *cobra.Command, args []string) error {
@@ -70,13 +75,13 @@ func runUp(cmd *cobra.Command, args []string) error {
 
 	// Determine which migrations to apply
 	var migrationsToApply []Migration
-	if stepCount > 0 {
-		if stepCount > len(pendingMigrations) {
-			stepCount = len(pendingMigrations)
+	if upStepCount > 0 {
+		if upStepCount > len(pendingMigrations) {
+			upStepCount = len(pendingMigrations)
 		}
-		migrationsToApply = pendingMigrations[:stepCount]
-	} else if toMigration != "" {
-		migrationsToApply = filterMigrationsToID(pendingMigrations, toMigration)
+		migrationsToApply = pendingMigrations[:upStepCount]
+	} else if upToMigration != "" {
+		migrationsToApply = filterMigrationsToID(pendingMigrations, upToMigration)
 	} else {
 		migrationsToApply = pendingMigrations
 	}
@@ -107,51 +112,7 @@ type Migration struct {
 }
 
 func getAvailableMigrations(migrationType string) ([]Migration, error) {
-	migrationDir := filepath.Join("database", "migration", migrationType)
-
-	if _, err := os.Stat(migrationDir); os.IsNotExist(err) {
-		return []Migration{}, nil
-	}
-
-	files, err := os.ReadDir(migrationDir)
-	if err != nil {
-		return nil, err
-	}
-
-	var migrations []Migration
-	for _, file := range files {
-		if file.IsDir() || !strings.HasSuffix(file.Name(), ".up.sql") {
-			continue
-		}
-
-		// Parse filename: 00001_create_table.up.sql
-		parts := strings.Split(strings.TrimSuffix(file.Name(), ".up.sql"), "_")
-		if len(parts) < 2 {
-			continue
-		}
-
-		migrationID := parts[0]
-		migrationName := strings.Join(parts[1:], "_")
-
-		migrations = append(migrations, Migration{
-			ID:   migrationID,
-			Name: migrationName,
-			Path: filepath.Join(migrationDir, file.Name()),
-		})
-	}
-
-	// Sort migrations by ID
-	sort.Slice(migrations, func(i, j int) bool {
-		// Handle both sequential and timestamp formats
-		if isSequentialID(migrations[i].ID) && isSequentialID(migrations[j].ID) {
-			seqI, _ := strconv.Atoi(migrations[i].ID)
-			seqJ, _ := strconv.Atoi(migrations[j].ID)
-			return seqI < seqJ
-		}
-		return migrations[i].ID < migrations[j].ID
-	})
-
-	return migrations, nil
+	return GetAvailableMigrationsWithPath(migrationType, upCustomPath)
 }
 
 func isSequentialID(id string) bool {
@@ -160,9 +121,39 @@ func isSequentialID(id string) bool {
 }
 
 func getAppliedMigrations(migrationType string) ([]string, error) {
-	// TODO: Implement database connection and migration table query
-	// For now, return empty slice (assume no migrations applied)
-	return []string{}, nil
+	var config *database.DatabaseConfig
+	var err error
+
+	// If connection flag is provided, use it directly
+	if upConnection != "" {
+		config = database.ParseConnectionString(upConnection)
+		if config == nil {
+			return nil, fmt.Errorf("invalid connection string: %s", upConnection)
+		}
+	} else {
+		// Get database configuration using helper function
+		config, err = GetDatabaseConnection()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Connect to database
+	db, err := database.Connect(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to database: %v", err)
+	}
+
+	// Get migration executor
+	executor := database.NewMigrationExecutor(db)
+
+	// Ensure migration table exists
+	if err := executor.EnsureMigrationTable(); err != nil {
+		return nil, fmt.Errorf("failed to ensure migration table: %v", err)
+	}
+
+	// Get applied migrations
+	return executor.GetAppliedMigrations(migrationType)
 }
 
 func filterPendingMigrations(available []Migration, applied []string) []Migration {
@@ -193,19 +184,53 @@ func filterMigrationsToID(migrations []Migration, targetID string) []Migration {
 }
 
 func applyMigration(migration Migration, migrationType string) error {
-	// TODO: Implement actual database execution
-	// For now, just simulate the process
-
 	// Read migration file
 	content, err := os.ReadFile(migration.Path)
 	if err != nil {
 		return fmt.Errorf("failed to read migration file: %v", err)
 	}
 
-	// TODO: Execute SQL against database
-	fmt.Printf("   Executing: %s\n", string(content))
+	var config *database.DatabaseConfig
 
-	// TODO: Record migration as applied in database
+	// If connection flag is provided, use it directly
+	if upConnection != "" {
+		config = database.ParseConnectionString(upConnection)
+		if config == nil {
+			return fmt.Errorf("invalid connection string: %s", upConnection)
+		}
+	} else {
+		// Load database configuration from .env
+		config = database.LoadFromEnv()
+	}
+
+	// Connect to database
+	db, err := database.Connect(config)
+	if err != nil {
+		return fmt.Errorf("failed to connect to database: %v", err)
+	}
+
+	// Get migration executor
+	executor := database.NewMigrationExecutor(db)
+
+	// Ensure migration table exists
+	if err := executor.EnsureMigrationTable(); err != nil {
+		return fmt.Errorf("failed to ensure migration table: %v", err)
+	}
+
+	// Execute migration
+	startTime := time.Now()
+	if err := executor.ExecuteMigration(string(content), migrationType); err != nil {
+		return fmt.Errorf("failed to execute migration: %v", err)
+	}
+	executionTime := time.Since(startTime).Milliseconds()
+
+	// Record migration as applied
+	checksum := database.GetMigrationChecksum(string(content))
+	if err := executor.RecordMigration(migration.ID, migration.Name, migrationType, checksum, executionTime); err != nil {
+		return fmt.Errorf("failed to record migration: %v", err)
+	}
+
+	fmt.Printf("   ✅ Executed in %dms\n", executionTime)
 
 	return nil
 }

@@ -6,7 +6,9 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/risoftinc/elsa/internal/database"
 	"github.com/spf13/cobra"
 )
 
@@ -20,18 +22,26 @@ Examples:
   elsa migration down ddl                    # Rollback last DDL migration
   elsa migration down dml                    # Rollback last DML migration
   elsa migration down ddl --step 2           # Rollback 2 DDL migrations
-  elsa migration down ddl --to 00001         # Rollback DDL migrations down to ID 00001`,
+  elsa migration down ddl --to 00002         # Rollback DDL migrations down to ID 00002
+  elsa migration down ddl --from 00005       # Rollback DDL migrations from ID 00005
+  elsa migration down ddl --path custom/migrations  # Use custom migration path`,
 		Args: cobra.ExactArgs(1),
 		RunE: runDown,
 	}
 
-	downStepCount   int
-	downToMigration string
+	downStepCount     int
+	downToMigration   string
+	downFromMigration string
+	downCustomPath    string
+	downConnection    string
 )
 
 func init() {
-	downCmd.Flags().IntVarP(&downStepCount, "step", "s", 1, "Number of migrations to rollback")
+	downCmd.Flags().IntVarP(&downStepCount, "step", "s", 0, "Number of migrations to rollback")
 	downCmd.Flags().StringVarP(&downToMigration, "to", "t", "", "Rollback migrations down to specific ID")
+	downCmd.Flags().StringVarP(&downFromMigration, "from", "f", "", "Rollback migrations from specific ID")
+	downCmd.Flags().StringVarP(&downCustomPath, "path", "p", "", "Custom migration path")
+	downCmd.Flags().StringVarP(&downConnection, "connection", "c", "", "Database connection string (e.g., mysql://user:pass@host:port/db)")
 }
 
 func runDown(cmd *cobra.Command, args []string) error {
@@ -42,50 +52,43 @@ func runDown(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("migration type must be 'ddl' or 'dml', got: %s", migrationType)
 	}
 
-	// Get available migrations
-	migrations, err := getAvailableMigrations(migrationType)
-	if err != nil {
-		return fmt.Errorf("failed to get available migrations: %v", err)
-	}
-
-	if len(migrations) == 0 {
-		fmt.Printf("ℹ️  No %s migrations found\n", strings.ToUpper(migrationType))
-		return nil
-	}
-
 	// Get applied migrations from database
-	appliedMigrations, err := getAppliedMigrations(migrationType)
+	appliedMigrations, err := getAppliedMigrationsForDown(migrationType)
 	if err != nil {
 		return fmt.Errorf("failed to get applied migrations: %v", err)
 	}
 
-	// Filter applied migrations
-	appliedMigrationsList := filterAppliedMigrations(migrations, appliedMigrations)
-
-	if len(appliedMigrationsList) == 0 {
+	if len(appliedMigrations) == 0 {
 		fmt.Printf("ℹ️  No %s migrations have been applied\n", strings.ToUpper(migrationType))
 		return nil
 	}
 
-	// Sort applied migrations in reverse order (newest first)
-	sort.Slice(appliedMigrationsList, func(i, j int) bool {
-		if isSequentialID(appliedMigrationsList[i].ID) && isSequentialID(appliedMigrationsList[j].ID) {
-			seqI, _ := strconv.Atoi(appliedMigrationsList[i].ID)
-			seqJ, _ := strconv.Atoi(appliedMigrationsList[j].ID)
-			return seqI > seqJ
-		}
-		return appliedMigrationsList[i].ID > appliedMigrationsList[j].ID
-	})
+	// Get available migration files to map IDs to names
+	availableMigrations, err := GetAvailableMigrationsWithPath(migrationType, downCustomPath)
+	if err != nil {
+		return fmt.Errorf("failed to get available migrations: %v", err)
+	}
+
+	// Create ID to Migration mapping
+	idToMigration := make(map[string]Migration)
+	for _, m := range availableMigrations {
+		idToMigration[m.ID] = m
+	}
 
 	// Determine which migrations to rollback
-	var migrationsToRollback []Migration
-	if downToMigration != "" {
-		migrationsToRollback = filterMigrationsFromID(appliedMigrationsList, downToMigration)
-	} else {
-		if downStepCount > len(appliedMigrationsList) {
-			downStepCount = len(appliedMigrationsList)
+	var migrationsToRollback []string
+	if downStepCount > 0 {
+		if downStepCount > len(appliedMigrations) {
+			downStepCount = len(appliedMigrations)
 		}
-		migrationsToRollback = appliedMigrationsList[:downStepCount]
+		migrationsToRollback = appliedMigrations[len(appliedMigrations)-downStepCount:]
+	} else if downToMigration != "" {
+		migrationsToRollback = filterMigrationsFromID(appliedMigrations, downToMigration)
+	} else if downFromMigration != "" {
+		migrationsToRollback = filterMigrationsFromID(appliedMigrations, downFromMigration)
+	} else {
+		// Default: rollback last migration
+		migrationsToRollback = appliedMigrations[len(appliedMigrations)-1:]
 	}
 
 	if len(migrationsToRollback) == 0 {
@@ -93,12 +96,29 @@ func runDown(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	// Sort migrations in reverse order (newest first) for rollback
+	sort.Slice(migrationsToRollback, func(i, j int) bool {
+		// Handle both sequential and timestamp formats
+		if isSequentialID(migrationsToRollback[i]) && isSequentialID(migrationsToRollback[j]) {
+			seqI, _ := strconv.Atoi(migrationsToRollback[i])
+			seqJ, _ := strconv.Atoi(migrationsToRollback[j])
+			return seqI > seqJ
+		}
+		return migrationsToRollback[i] > migrationsToRollback[j]
+	})
+
 	// Rollback migrations
 	fmt.Printf("🔄 Rolling back %d %s migration(s)...\n", len(migrationsToRollback), strings.ToUpper(migrationType))
 
-	for _, migration := range migrationsToRollback {
+	for _, migrationID := range migrationsToRollback {
+		migration, exists := idToMigration[migrationID]
+		if !exists {
+			fmt.Printf("⚠️  Warning: Migration file for ID %s not found, skipping\n", migrationID)
+			continue
+		}
+
 		if err := rollbackMigration(migration, migrationType); err != nil {
-			return fmt.Errorf("failed to rollback migration %s: %v", migration.ID, err)
+			return fmt.Errorf("failed to rollback migration %s: %v", migrationID, err)
 		}
 		fmt.Printf("✅ Rolled back: %s_%s\n", migration.ID, migration.Name)
 	}
@@ -107,52 +127,112 @@ func runDown(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func filterAppliedMigrations(available []Migration, applied []string) []Migration {
-	appliedMap := make(map[string]bool)
-	for _, id := range applied {
-		appliedMap[id] = true
-	}
+func filterMigrationsFromID(migrations []string, targetID string) []string {
+	var result []string
+	found := false
 
-	var appliedList []Migration
-	for _, m := range available {
-		if appliedMap[m.ID] {
-			appliedList = append(appliedList, m)
+	for _, id := range migrations {
+		if id == targetID {
+			found = true
+		}
+		if found {
+			result = append(result, id)
 		}
 	}
 
-	return appliedList
-}
-
-func filterMigrationsFromID(migrations []Migration, targetID string) []Migration {
-	var result []Migration
-	for _, m := range migrations {
-		result = append(result, m)
-		if m.ID == targetID {
-			break
-		}
-	}
 	return result
 }
 
-func rollbackMigration(migration Migration, migrationType string) error {
-	// Find the corresponding down migration file
-	downFilePath := strings.Replace(migration.Path, ".up.sql", ".down.sql", 1)
+// getAppliedMigrationsForDown retrieves applied migrations from database for down command
+func getAppliedMigrationsForDown(migrationType string) ([]string, error) {
+	var config *database.DatabaseConfig
+	var err error
 
-	// Check if down migration file exists
-	if _, err := os.Stat(downFilePath); os.IsNotExist(err) {
-		return fmt.Errorf("down migration file not found: %s", downFilePath)
+	// If connection flag is provided, use it directly
+	if downConnection != "" {
+		config = database.ParseConnectionString(downConnection)
+		if config == nil {
+			return nil, fmt.Errorf("invalid connection string: %s", downConnection)
+		}
+	} else {
+		// Get database configuration using helper function
+		config, err = GetDatabaseConnection()
+		if err != nil {
+			return nil, err
+		}
 	}
 
+	// Connect to database
+	db, err := database.Connect(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to database: %v", err)
+	}
+
+	// Get migration executor
+	executor := database.NewMigrationExecutor(db)
+
+	// Ensure migration table exists
+	if err := executor.EnsureMigrationTable(); err != nil {
+		return nil, fmt.Errorf("failed to ensure migration table: %v", err)
+	}
+
+	// Get applied migrations
+	return executor.GetAppliedMigrations(migrationType)
+}
+
+func rollbackMigration(migration Migration, migrationType string) error {
 	// Read down migration file
+	downFilePath := strings.Replace(migration.Path, ".up.sql", ".down.sql", 1)
+
 	content, err := os.ReadFile(downFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to read down migration file: %v", err)
 	}
 
-	// TODO: Execute SQL against database
-	fmt.Printf("   Executing rollback: %s\n", string(content))
+	var config *database.DatabaseConfig
 
-	// TODO: Remove migration from applied list in database
+	// If connection flag is provided, use it directly
+	if downConnection != "" {
+		config = database.ParseConnectionString(downConnection)
+		if config == nil {
+			return fmt.Errorf("invalid connection string: %s", downConnection)
+		}
+	} else {
+		// Get database configuration using helper function
+		var err error
+		config, err = GetDatabaseConnection()
+		if err != nil {
+			return err
+		}
+	}
+
+	// Connect to database
+	db, err := database.Connect(config)
+	if err != nil {
+		return fmt.Errorf("failed to connect to database: %v", err)
+	}
+
+	// Get migration executor
+	executor := database.NewMigrationExecutor(db)
+
+	// Ensure migration table exists
+	if err := executor.EnsureMigrationTable(); err != nil {
+		return fmt.Errorf("failed to ensure migration table: %v", err)
+	}
+
+	// Execute rollback migration
+	startTime := time.Now()
+	if err := executor.ExecuteMigration(string(content), migrationType); err != nil {
+		return fmt.Errorf("failed to execute rollback migration: %v", err)
+	}
+	executionTime := time.Since(startTime).Milliseconds()
+
+	// Remove migration record
+	if err := executor.RemoveMigration(migration.ID); err != nil {
+		return fmt.Errorf("failed to remove migration record: %v", err)
+	}
+
+	fmt.Printf("   ✅ Rolled back in %dms\n", executionTime)
 
 	return nil
 }

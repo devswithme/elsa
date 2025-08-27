@@ -12,11 +12,12 @@ var (
 		Long: `Database migration commands for managing DDL and DML changes.
 		
 Examples:
+  elsa migration connect                                            Connect to database interactively
+  elsa migration connect -c "sqlite://elsa.db"                     Connect using connection string flag
   elsa migration create ddl create_users_table                      Create new DDL migration (timestamp with ms)
   elsa migration create dml seed_users_data                         Create new DML migration (timestamp with ms)
-  elsa migration create ddl create_table --timestamp                Create with timestamp format (YYYYMMDDHHMMSSmmm) with milliseconds - default
-  elsa migration create ddl create_table --sequential               Create with sequential format (00001, 00002, etc.)
-  elsa migration create ddl create_table --path custom/migrations   Custom folder path (default: database/migration/[ddl|dml])
+  elsa migration create ddl create_table --sequential               Create with sequential format
+  elsa migration create ddl create_table --path custom/migrations   Custom folder path
   elsa migration up ddl                                             Apply all DDL migrations
   elsa migration down dml                                           Rollback last DML migration
   elsa migration status                                             Show migration status
@@ -37,6 +38,7 @@ func MigrateCmd() *cobra.Command {
 func init() {
 	// Add subcommands
 	migrateCmd.AddCommand(createCmd)
+	migrateCmd.AddCommand(connectCmd)
 	migrateCmd.AddCommand(upCmd)
 	migrateCmd.AddCommand(downCmd)
 	migrateCmd.AddCommand(refreshCmd)

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -288,4 +290,63 @@ func determineMigrationFormat(fileName string) string {
 	}
 
 	return "unknown"
+}
+
+// GetMigrationPath returns the migration directory path for a given type
+// This function can be used by other migration commands to get the correct path
+func GetMigrationPath(migrationType string, customPath string) string {
+	if customPath != "" {
+		return filepath.Join(customPath, migrationType)
+	}
+	return filepath.Join("database", "migration", migrationType)
+}
+
+// GetAvailableMigrationsWithPath returns available migrations from a specific path
+// This function can be used by other migration commands to get migrations with custom path
+func GetAvailableMigrationsWithPath(migrationType string, customPath string) ([]Migration, error) {
+	migrationDir := GetMigrationPath(migrationType, customPath)
+
+	if _, err := os.Stat(migrationDir); os.IsNotExist(err) {
+		return []Migration{}, nil
+	}
+
+	files, err := os.ReadDir(migrationDir)
+	if err != nil {
+		return nil, err
+	}
+
+	var migrations []Migration
+	for _, file := range files {
+		if file.IsDir() || !strings.HasSuffix(file.Name(), ".up.sql") {
+			continue
+		}
+
+		// Parse filename: 00001_create_table.up.sql
+		parts := strings.Split(strings.TrimSuffix(file.Name(), ".up.sql"), "_")
+		if len(parts) < 2 {
+			continue
+		}
+
+		migrationID := parts[0]
+		migrationName := strings.Join(parts[1:], "_")
+
+		migrations = append(migrations, Migration{
+			ID:   migrationID,
+			Name: migrationName,
+			Path: filepath.Join(migrationDir, file.Name()),
+		})
+	}
+
+	// Sort migrations by ID
+	sort.Slice(migrations, func(i, j int) bool {
+		// Handle both sequential and timestamp formats
+		if isSequentialID(migrations[i].ID) && isSequentialID(migrations[j].ID) {
+			seqI, _ := strconv.Atoi(migrations[i].ID)
+			seqJ, _ := strconv.Atoi(migrations[j].ID)
+			return seqI < seqJ
+		}
+		return migrations[i].ID < migrations[j].ID
+	})
+
+	return migrations, nil
 }
