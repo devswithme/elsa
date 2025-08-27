@@ -29,6 +29,7 @@ Examples:
 		RunE: runDown,
 	}
 
+	downAll           bool
 	downStepCount     int
 	downToMigration   string
 	downFromMigration string
@@ -42,6 +43,7 @@ func init() {
 	downCmd.Flags().StringVarP(&downFromMigration, "from", "f", "", "Rollback migrations from specific ID")
 	downCmd.Flags().StringVarP(&downCustomPath, "path", "p", "", "Custom migration path")
 	downCmd.Flags().StringVarP(&downConnection, "connection", "c", "", "Database connection string (e.g., mysql://user:pass@host:port/db)")
+	downCmd.Flags().BoolVarP(&downAll, "all", "a", false, "Rollback all migrations")
 }
 
 func runDown(cmd *cobra.Command, args []string) error {
@@ -77,7 +79,9 @@ func runDown(cmd *cobra.Command, args []string) error {
 
 	// Determine which migrations to rollback
 	var migrationsToRollback []string
-	if downStepCount > 0 {
+	if downAll {
+		migrationsToRollback = appliedMigrations
+	} else if downStepCount > 0 {
 		if downStepCount > len(appliedMigrations) {
 			downStepCount = len(appliedMigrations)
 		}
