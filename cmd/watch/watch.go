@@ -67,12 +67,16 @@ func runWatch(cmd *cobra.Command, args []string) {
 		log.Fatal("Error adding directories to watch:", err)
 	}
 
-	// Channel for restart signals
+	// Channel for restart signals and process management
 	restartChan := make(chan bool, 1)
+	processChan := make(chan *exec.Cmd, 1)
+	stopChan := make(chan bool, 1)
+
+	// Process management
+	var currentProcess *exec.Cmd
 
 	// Start the initial command
-	var currentProcess *exec.Cmd
-	go runCommand(command, restartChan)
+	go runCommand(command, restartChan, processChan, stopChan)
 
 	// Handle file system events
 	go func() {
@@ -86,6 +90,11 @@ func runWatch(cmd *cobra.Command, args []string) {
 				// Only restart on Go file changes
 				if shouldRestart(event) {
 					fmt.Printf("📝 File changed: %s\n", event.Name)
+					// Stop current process before restarting
+					if currentProcess != nil && currentProcess.Process != nil {
+						fmt.Println("🛑 Stopping current process for restart...")
+						currentProcess.Process.Kill()
+					}
 					select {
 					case restartChan <- true:
 					default:
@@ -101,12 +110,24 @@ func runWatch(cmd *cobra.Command, args []string) {
 		}
 	}()
 
+	// Handle process management
+	go func() {
+		for {
+			select {
+			case process := <-processChan:
+				currentProcess = process
+			case <-stopChan:
+				return
+			}
+		}
+	}()
+
 	// Handle restart signals
 	go func() {
 		for range restartChan {
 			time.Sleep(watchDelay)
 			fmt.Println("🔄 Restarting...")
-			go runCommand(command, restartChan)
+			go runCommand(command, restartChan, processChan, stopChan)
 		}
 	}()
 
@@ -116,12 +137,11 @@ func runWatch(cmd *cobra.Command, args []string) {
 	<-sigChan
 
 	fmt.Println("\n👋 Stopping watch mode...")
-	if currentProcess != nil && currentProcess.Process != nil {
-		currentProcess.Process.Kill()
-	}
+	stopChan <- true
+	watcher.Close()
 }
 
-func runCommand(command string, restartChan chan bool) {
+func runCommand(command string, restartChan chan bool, processChan chan *exec.Cmd, stopChan chan bool) {
 	fmt.Printf("▶️  Running: %s\n", command)
 
 	// Split command for cross-platform compatibility
@@ -136,10 +156,27 @@ func runCommand(command string, restartChan chan bool) {
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 
+	// Send process to main goroutine for management
+	select {
+	case processChan <- cmd:
+	default:
+	}
+
 	if err := cmd.Start(); err != nil {
 		fmt.Printf("❌ Error starting command: %v\n", err)
 		fmt.Println("⏳ Waiting for file changes...")
 		return
+	}
+
+	// Check if we should stop
+	select {
+	case <-stopChan:
+		fmt.Println("🛑 Stopping current process...")
+		if cmd.Process != nil {
+			cmd.Process.Kill()
+		}
+		return
+	default:
 	}
 
 	// Wait for command to complete
