@@ -70,9 +70,6 @@ fmt:
 	go fmt ./...
 	go vet ./...
 
-# Generate documentation
-docs:
-	godoc -http=:6060
 `
 
 	// Write Elsafile
