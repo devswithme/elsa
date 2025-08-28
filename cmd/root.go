@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"runtime"
+	"strings"
 
 	"github.com/risoftinc/elsa/cmd/elsafile"
 	"github.com/risoftinc/elsa/cmd/migrate"
@@ -17,12 +18,17 @@ var (
 
 	// rootCmd represents the base command when called without any subcommands
 	rootCmd = &cobra.Command{
-		Use:                "elsa",
-		Short:              "Elsa - Engineer’s Little Smart Assistant",
-		DisableFlagParsing: true,
-		Args:               cobra.ArbitraryArgs,
+		Use:   "elsa",
+		Short: "Elsa - Engineer’s Little Smart Assistant",
+		Args:  cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
+				// Check if the first argument is a flag (starts with -)
+				if strings.HasPrefix(args[0], "-") {
+					// This is a flag, let cobra handle it normally
+					return nil
+				}
+
 				// Try to handle as Elsafile command
 				handler := elsafile.NewSimpleHandlerWithRoot(cmd)
 				if err := handler.HandleUnknownCommand(args[0]); err != nil {
