@@ -25,7 +25,7 @@ var (
 Only Go files (*.go) are monitored to avoid unnecessary restarts from temporary files or uploads.
 Automatically excludes common Go development folders like vendor, build, bin, pkg, etc.
 
-Example:
+Examples:
   elsa watch "go run main.go"
   elsa watch "go build && ./elsa"
   elsa watch "go test ./..."`,
@@ -52,8 +52,7 @@ func runWatch(cmd *cobra.Command, args []string) {
 	fmt.Printf("⏱️ Restart delay: %v\n", watchDelay)
 	fmt.Printf("🔍 File extensions: %v\n", watchExtensions)
 	fmt.Printf("🚫 Excluded dirs: %v\n", watchExcludeDirs)
-	fmt.Println("Press Ctrl+C to stop watching")
-	fmt.Println()
+	fmt.Println("Press Ctrl+C to stop watching\n")
 
 	// Create watcher
 	watcher, err := fsnotify.NewWatcher()
@@ -67,20 +66,13 @@ func runWatch(cmd *cobra.Command, args []string) {
 		log.Fatal("Error adding directories to watch:", err)
 	}
 
-	// Channel for restart signals and process management
-	restartChan := make(chan bool, 1)
-	processChan := make(chan *exec.Cmd, 1)
-	stopChan := make(chan bool, 1)
-	killChan := make(chan bool, 1)
-
-	// Process management with mutex-like behavior
+	// Process management
 	var currentProcess *exec.Cmd
-	var isRestarting bool
+	var debounce <-chan time.Time
 
-	// Start the initial command
-	go runCommand(command, restartChan, processChan, stopChan, killChan)
+	// Start initial command
+	startCommand(command, &currentProcess)
 
-	// Handle file system events
 	go func() {
 		for {
 			select {
@@ -88,26 +80,16 @@ func runWatch(cmd *cobra.Command, args []string) {
 				if !ok {
 					return
 				}
-
-				// Only restart on Go file changes
-				if shouldRestart(event) && !isRestarting {
+				if shouldRestart(event) {
 					fmt.Printf("📝 File changed: %s\n", event.Name)
-					isRestarting = true
-
-					// Stop current process before restarting
-					if currentProcess != nil && currentProcess.Process != nil {
-						fmt.Println("🛑 Stopping current process for restart...")
-						killChan <- true
-						forceKillProcess(currentProcess)
-						// Wait longer for process to fully terminate and port to be released
-						time.Sleep(1 * time.Second)
-					}
-
-					select {
-					case restartChan <- true:
-					default:
-					}
+					debounce = time.After(watchDelay)
 				}
+
+			case <-debounce:
+				fmt.Println("🔄 Restarting...")
+				stopCommand(currentProcess)
+				startCommand(command, &currentProcess)
+				debounce = nil
 
 			case err, ok := <-watcher.Errors:
 				if !ok {
@@ -118,89 +100,60 @@ func runWatch(cmd *cobra.Command, args []string) {
 		}
 	}()
 
-	// Handle process management
-	go func() {
-		for {
-			select {
-			case process := <-processChan:
-				currentProcess = process
-				isRestarting = false
-			case <-stopChan:
-				return
-			}
-		}
-	}()
-
-	// Handle restart signals
-	go func() {
-		for range restartChan {
-			time.Sleep(watchDelay)
-			fmt.Println("🔄 Restarting...")
-			go runCommand(command, restartChan, processChan, stopChan, killChan)
-		}
-	}()
-
-	// Wait for interrupt signal
+	// Handle SIGINT / SIGTERM
 	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	<-sigChan
 
 	fmt.Println("\n👋 Stopping watch mode...")
-	stopChan <- true
-	watcher.Close()
+	stopCommand(currentProcess)
 }
 
-func runCommand(command string, restartChan chan bool, processChan chan *exec.Cmd, stopChan chan bool, killChan chan bool) {
+func startCommand(command string, currentProcess **exec.Cmd) {
 	fmt.Printf("▶️  Running: %s\n", command)
 
-	// Split command for cross-platform compatibility
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
 		cmd = exec.Command("cmd", "/C", command)
 	} else {
 		cmd = exec.Command("bash", "-c", command)
+		// hanya di Unix
+		// cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	}
 
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 
-	// Send process to main goroutine for management
-	select {
-	case processChan <- cmd:
-	default:
-	}
-
 	if err := cmd.Start(); err != nil {
 		fmt.Printf("❌ Error starting command: %v\n", err)
-		fmt.Println("⏳ Waiting for file changes...")
 		return
 	}
 
-	// Check if we should stop
-	select {
-	case <-stopChan:
-		fmt.Println("🛑 Stopping current process...")
-		if cmd.Process != nil {
-			forceKillProcess(cmd)
-		}
-		return
-	case <-killChan:
-		fmt.Println("🛑 Process killed for restart...")
-		if cmd.Process != nil {
-			forceKillProcess(cmd)
-		}
-		return
-	default:
-	}
+	*currentProcess = cmd
 
-	// Wait for command to complete
-	if err := cmd.Wait(); err != nil {
-		fmt.Printf("❌ Command failed: %v\n", err)
-		fmt.Println("⏳ Waiting for file changes...")
+	go func() {
+		if err := cmd.Wait(); err != nil {
+			fmt.Printf("❌ Command exited with error: %v\n", err)
+		} else {
+			fmt.Println("✅ Command completed")
+		}
+	}()
+}
+
+func stopCommand(cmd *exec.Cmd) {
+	if cmd == nil || cmd.Process == nil {
+		return
+	}
+	pid := cmd.Process.Pid
+	fmt.Printf("🛑 Killing process PID: %d\n", pid)
+
+	if runtime.GOOS == "windows" {
+		// pakai taskkill di Windows
+		_ = exec.Command("taskkill", "/F", "/T", "/PID", fmt.Sprintf("%d", pid)).Run()
 	} else {
-		fmt.Println("✅ Command completed successfully")
-		fmt.Println("⏳ Waiting for file changes...")
+		// pakai syscall di Unix
+		// _ = syscall.Kill(-pid, syscall.SIGKILL)
 	}
 }
 
@@ -209,8 +162,6 @@ func addDirectoriesToWatch(watcher *fsnotify.Watcher) error {
 		if err != nil {
 			return err
 		}
-
-		// Skip excluded directories
 		if info.IsDir() {
 			dirName := filepath.Base(path)
 			for _, excluded := range watchExcludeDirs {
@@ -218,31 +169,24 @@ func addDirectoriesToWatch(watcher *fsnotify.Watcher) error {
 					return filepath.SkipDir
 				}
 			}
-
-			// Add directory to watcher
 			if err := watcher.Add(path); err != nil {
 				fmt.Printf("⚠️  Warning: Could not watch directory %s: %v\n", path, err)
 			}
 		}
-
 		return nil
 	})
 }
 
 func shouldRestart(event fsnotify.Event) bool {
-	// Only restart on Go file changes
-	if event.Op&fsnotify.Write == 0 && event.Op&fsnotify.Create == 0 {
+	if event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Remove|fsnotify.Rename) == 0 {
 		return false
 	}
-
-	// Check if it's a Go file
 	ext := filepath.Ext(event.Name)
 	for _, watchExt := range watchExtensions {
 		if ext == watchExt {
 			return true
 		}
 	}
-
 	return false
 }
 
@@ -252,24 +196,4 @@ func getCurrentDir() string {
 		return "."
 	}
 	return dir
-}
-
-// forceKillProcess forcefully terminates a process and its children
-func forceKillProcess(cmd *exec.Cmd) {
-	if cmd == nil || cmd.Process == nil {
-		return
-	}
-
-	// Kill the main process
-	cmd.Process.Kill()
-
-	// On Windows, we need to be more aggressive
-	if runtime.GOOS == "windows" {
-		// Use taskkill to force kill the process tree
-		killCmd := exec.Command("taskkill", "/F", "/T", "/PID", fmt.Sprintf("%d", cmd.Process.Pid))
-		killCmd.Run()
-	}
-
-	// Wait for process to terminate
-	cmd.Wait()
 }
