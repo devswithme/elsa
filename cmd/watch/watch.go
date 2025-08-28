@@ -93,7 +93,9 @@ func runWatch(cmd *cobra.Command, args []string) {
 					// Stop current process before restarting
 					if currentProcess != nil && currentProcess.Process != nil {
 						fmt.Println("🛑 Stopping current process for restart...")
-						currentProcess.Process.Kill()
+						forceKillProcess(currentProcess)
+						// Wait a bit for process to fully terminate and port to be released
+						time.Sleep(500 * time.Millisecond)
 					}
 					select {
 					case restartChan <- true:
@@ -173,7 +175,7 @@ func runCommand(command string, restartChan chan bool, processChan chan *exec.Cm
 	case <-stopChan:
 		fmt.Println("🛑 Stopping current process...")
 		if cmd.Process != nil {
-			cmd.Process.Kill()
+			forceKillProcess(cmd)
 		}
 		return
 	default:
@@ -237,4 +239,24 @@ func getCurrentDir() string {
 		return "."
 	}
 	return dir
+}
+
+// forceKillProcess forcefully terminates a process and its children
+func forceKillProcess(cmd *exec.Cmd) {
+	if cmd == nil || cmd.Process == nil {
+		return
+	}
+
+	// Kill the main process
+	cmd.Process.Kill()
+
+	// On Windows, we need to be more aggressive
+	if runtime.GOOS == "windows" {
+		// Use taskkill to force kill the process tree
+		killCmd := exec.Command("taskkill", "/F", "/T", "/PID", fmt.Sprintf("%d", cmd.Process.Pid))
+		killCmd.Run()
+	}
+
+	// Wait for process to terminate
+	cmd.Wait()
 }
