@@ -19,21 +19,7 @@ var (
 		Use:   "elsa",
 		Short: "Elsa - Engineer’s Little Smart Assistant",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println(getBanner(version) + `
-		
-Usage:
-  elsa [flags]
-  elsa [command]
-
-Available Commands:
-  completion  Generate the autocompletion script for the specified shell
-  help        Help about any command
-  migration   Database migration commands
-  watch       Watch Go files and auto-restart on changes
-
-Flags:
-  -h, --help      help for elsa
-  -v, --version   version for elsa`)
+			customRootTemplate(cmd)
 		},
 	}
 )
@@ -57,6 +43,28 @@ func SetVersionInfo(v string) {
 	// Override the version command to use our version info
 	rootCmd.Version = version
 	rootCmd.SetVersionTemplate(customVersionTemplate())
+}
+
+func customRootTemplate(cmd *cobra.Command) {
+	fmt.Println(getBanner(version) + `
+		
+Usage:
+  elsa [flags]
+  elsa [command]
+
+Available Commands:`)
+
+	for _, c := range cmd.Commands() {
+		if (!c.IsAvailableCommand() || c.Hidden) && c.Name() != "help" {
+			continue
+		}
+		fmt.Printf("  %-12s %s\n", c.Name(), c.Short)
+	}
+
+	fmt.Println(`
+Flags:
+  -h, --help      help for elsa
+  -v, --version   version for elsa`)
 }
 
 func customVersionTemplate() string {
