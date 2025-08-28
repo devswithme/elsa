@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"runtime"
 
+	"github.com/risoftinc/elsa/cmd/elsafile"
 	"github.com/risoftinc/elsa/cmd/migrate"
 	"github.com/risoftinc/elsa/cmd/watch"
 	"github.com/spf13/cobra"
@@ -16,10 +17,31 @@ var (
 
 	// rootCmd represents the base command when called without any subcommands
 	rootCmd = &cobra.Command{
-		Use:   "elsa",
-		Short: "Elsa - Engineer’s Little Smart Assistant",
-		Run: func(cmd *cobra.Command, args []string) {
+		Use:                "elsa",
+		Short:              "Elsa - Engineer’s Little Smart Assistant",
+		DisableFlagParsing: true,
+		Args:               cobra.ArbitraryArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				// Try to handle as Elsafile command
+				handler := elsafile.NewSimpleHandler()
+				if err := handler.HandleUnknownCommand(args[0]); err != nil {
+					// If it's not an Elsafile command, show suggestions
+					suggestions := handler.SuggestCommands(args[0])
+					if len(suggestions) > 0 {
+						fmt.Printf("💡 Did you mean one of these commands?\n")
+						for _, suggestion := range suggestions {
+							fmt.Printf("  elsa %s\n", suggestion)
+						}
+						fmt.Println()
+					}
+					return err
+				}
+				return nil
+			}
+
 			customRootTemplate(cmd)
+			return nil
 		},
 	}
 )
@@ -35,6 +57,12 @@ func init() {
 
 	// Add watch command
 	rootCmd.AddCommand(watch.WatchCmd)
+
+	// Add Elsafile commands
+	rootCmd.AddCommand(elsafile.InitCmd)
+	rootCmd.AddCommand(elsafile.RunCmd)
+	rootCmd.AddCommand(elsafile.ListCmd)
+
 }
 
 // SetVersionInfo sets the version information for the application
