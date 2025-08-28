@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"runtime"
 
+	"github.com/risoftinc/elsa/cmd/elsafile"
 	"github.com/risoftinc/elsa/cmd/migrate"
 	"github.com/risoftinc/elsa/cmd/watch"
 	"github.com/spf13/cobra"
@@ -16,24 +17,31 @@ var (
 
 	// rootCmd represents the base command when called without any subcommands
 	rootCmd = &cobra.Command{
-		Use:   "elsa",
-		Short: "Elsa - Engineer’s Little Smart Assistant",
-		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println(getBanner(version) + `
-		
-Usage:
-  elsa [flags]
-  elsa [command]
+		Use:                "elsa",
+		Short:              "Elsa - Engineer’s Little Smart Assistant",
+		DisableFlagParsing: true,
+		Args:               cobra.ArbitraryArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				// Try to handle as Elsafile command
+				handler := elsafile.NewSimpleHandlerWithRoot(cmd)
+				if err := handler.HandleUnknownCommand(args[0]); err != nil {
+					// If it's not an Elsafile command, show suggestions
+					suggestions := handler.SuggestCommands(args[0])
+					if len(suggestions) > 0 {
+						fmt.Printf("💡 Did you mean one of these commands?\n")
+						for _, suggestion := range suggestions {
+							fmt.Printf("  elsa %s\n", suggestion)
+						}
+						fmt.Println()
+					}
+					return err
+				}
+				return nil
+			}
 
-Available Commands:
-  completion  Generate the autocompletion script for the specified shell
-  help        Help about any command
-  migration   Database migration commands
-  watch       Watch Go files and auto-restart on changes
-
-Flags:
-  -h, --help      help for elsa
-  -v, --version   version for elsa`)
+			customRootTemplate(cmd)
+			return nil
 		},
 	}
 )
@@ -49,6 +57,12 @@ func init() {
 
 	// Add watch command
 	rootCmd.AddCommand(watch.WatchCmd)
+
+	// Add Elsafile commands
+	rootCmd.AddCommand(elsafile.InitCmd)
+	rootCmd.AddCommand(elsafile.RunCmd)
+	rootCmd.AddCommand(elsafile.ListCmd)
+
 }
 
 // SetVersionInfo sets the version information for the application
@@ -57,6 +71,42 @@ func SetVersionInfo(v string) {
 	// Override the version command to use our version info
 	rootCmd.Version = version
 	rootCmd.SetVersionTemplate(customVersionTemplate())
+}
+
+func customRootTemplate(cmd *cobra.Command) {
+	fmt.Println(getBanner(version) + `
+		
+Usage:
+  elsa [flags]
+  elsa [command]
+
+Available Commands:`)
+
+	printAvaibleCommands(cmd)
+
+	fmt.Println(`
+Flags:
+  -h, --help      help for elsa
+  -v, --version   version for elsa`)
+}
+
+func printAvaibleCommands(cmd *cobra.Command) {
+	maxLen := 0
+	for _, c := range cmd.Commands() {
+		if (!c.IsAvailableCommand() || c.Hidden) && c.Name() != "help" {
+			continue
+		}
+		if l := len(c.Name()); l > maxLen {
+			maxLen = l
+		}
+	}
+
+	for _, c := range cmd.Commands() {
+		if (!c.IsAvailableCommand() || c.Hidden) && c.Name() != "help" {
+			continue
+		}
+		fmt.Printf("  %-*s %s\n", maxLen+1, c.Name(), c.Short)
+	}
 }
 
 func customVersionTemplate() string {
