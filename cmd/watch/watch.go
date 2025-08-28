@@ -52,7 +52,7 @@ func runWatch(cmd *cobra.Command, args []string) {
 	fmt.Printf("⏱️ Restart delay: %v\n", watchDelay)
 	fmt.Printf("🔍 File extensions: %v\n", watchExtensions)
 	fmt.Printf("🚫 Excluded dirs: %v\n", watchExcludeDirs)
-	fmt.Println("Press Ctrl+C to stop watching\n")
+	fmt.Printf("Press Ctrl+C to stop watching\n\n")
 
 	// Create watcher
 	watcher, err := fsnotify.NewWatcher()
@@ -69,6 +69,7 @@ func runWatch(cmd *cobra.Command, args []string) {
 	// Process management
 	var currentProcess *exec.Cmd
 	var debounce <-chan time.Time
+	var isRestarting bool
 
 	// Start initial command
 	startCommand(command, &currentProcess)
@@ -80,16 +81,20 @@ func runWatch(cmd *cobra.Command, args []string) {
 				if !ok {
 					return
 				}
-				if shouldRestart(event) {
+				if shouldRestart(event) && !isRestarting {
 					fmt.Printf("📝 File changed: %s\n", event.Name)
+					isRestarting = true
 					debounce = time.After(watchDelay)
 				}
 
 			case <-debounce:
 				fmt.Println("🔄 Restarting...")
 				stopCommand(currentProcess)
+				// Tunggu sebentar untuk memastikan port release
+				time.Sleep(2*time.Second + watchDelay)
 				startCommand(command, &currentProcess)
 				debounce = nil
+				isRestarting = false
 
 			case err, ok := <-watcher.Errors:
 				if !ok {
@@ -117,8 +122,6 @@ func startCommand(command string, currentProcess **exec.Cmd) {
 		cmd = exec.Command("cmd", "/C", command)
 	} else {
 		cmd = exec.Command("bash", "-c", command)
-		// hanya di Unix
-		// cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	}
 
 	cmd.Stdout = os.Stdout
@@ -134,7 +137,10 @@ func startCommand(command string, currentProcess **exec.Cmd) {
 
 	go func() {
 		if err := cmd.Wait(); err != nil {
-			fmt.Printf("❌ Command exited with error: %v\n", err)
+			// Jangan tampilkan error untuk command yang di-terminate
+			if err.Error() != "signal: interrupt" && err.Error() != "exit status 1" {
+				fmt.Printf("❌ Command exited with error: %v\n", err)
+			}
 		} else {
 			fmt.Println("✅ Command completed")
 		}
@@ -152,9 +158,12 @@ func stopCommand(cmd *exec.Cmd) {
 		// pakai taskkill di Windows
 		_ = exec.Command("taskkill", "/F", "/T", "/PID", fmt.Sprintf("%d", pid)).Run()
 	} else {
-		// pakai syscall di Unix
-		// _ = syscall.Kill(-pid, syscall.SIGKILL)
+		// pakai Process.Kill() yang cross-platform
+		_ = cmd.Process.Kill()
 	}
+
+	// Tunggu sebentar untuk memastikan process benar-benar mati
+	time.Sleep(1 * time.Second)
 }
 
 func addDirectoriesToWatch(watcher *fsnotify.Watcher) error {
@@ -178,7 +187,8 @@ func addDirectoriesToWatch(watcher *fsnotify.Watcher) error {
 }
 
 func shouldRestart(event fsnotify.Event) bool {
-	if event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Remove|fsnotify.Rename) == 0 {
+	// Hanya restart pada Write dan Create, bukan Remove dan Rename
+	if event.Op&(fsnotify.Write|fsnotify.Create) == 0 {
 		return false
 	}
 	ext := filepath.Ext(event.Name)
