@@ -121,7 +121,8 @@ func startCommand(command string, currentProcess **exec.Cmd) {
 	if runtime.GOOS == "windows" {
 		cmd = exec.Command("cmd", "/C", command)
 	} else {
-		cmd = exec.Command("bash", "-c", command)
+		// Gunakan shell yang universal untuk Unix systems (Linux, macOS, BSD)
+		cmd = exec.Command("sh", "-c", command)
 	}
 
 	cmd.Stdout = os.Stdout
@@ -158,8 +159,16 @@ func stopCommand(cmd *exec.Cmd) {
 		// pakai taskkill di Windows
 		_ = exec.Command("taskkill", "/F", "/T", "/PID", fmt.Sprintf("%d", pid)).Run()
 	} else {
-		// pakai Process.Kill() yang cross-platform
-		_ = cmd.Process.Kill()
+		// Untuk Unix systems (Linux, macOS, BSD)
+		// 1. Coba graceful kill dulu
+		_ = cmd.Process.Signal(syscall.SIGTERM)
+		time.Sleep(500 * time.Millisecond)
+
+		// 2. Force kill jika masih hidup
+		if isProcessRunning(pid) {
+			fmt.Printf("⚠️ Process still running, force killing...\n")
+			_ = cmd.Process.Kill()
+		}
 	}
 
 	// Tunggu sebentar untuk memastikan process benar-benar mati
@@ -206,4 +215,18 @@ func getCurrentDir() string {
 		return "."
 	}
 	return dir
+}
+
+// isProcessRunning checks if a process is still running (cross-platform)
+func isProcessRunning(pid int) bool {
+	if runtime.GOOS == "windows" {
+		// Windows: gunakan tasklist
+		cmd := exec.Command("tasklist", "/FI", fmt.Sprintf("PID eq %d", pid))
+		output, _ := cmd.Output()
+		return strings.Contains(string(output), fmt.Sprintf("%d", pid))
+	} else {
+		// Unix: gunakan kill -0 untuk check process
+		cmd := exec.Command("kill", "-0", fmt.Sprintf("%d", pid))
+		return cmd.Run() == nil
+	}
 }
