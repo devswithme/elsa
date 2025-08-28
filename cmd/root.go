@@ -5,6 +5,7 @@ import (
 	"runtime"
 
 	"github.com/risoftinc/elsa/cmd/migrate"
+	"github.com/risoftinc/elsa/cmd/watch"
 	"github.com/spf13/cobra"
 )
 
@@ -28,6 +29,7 @@ Available Commands:
   completion  Generate the autocompletion script for the specified shell
   help        Help about any command
   migration   Database migration commands
+  watch       Watch Go files and auto-restart on changes
 
 Flags:
   -h, --help      help for elsa
@@ -44,6 +46,9 @@ func Execute() error {
 func init() {
 	// Add migration command
 	rootCmd.AddCommand(migrate.MigrateCmd())
+
+	// Add watch command
+	rootCmd.AddCommand(watch.WatchCmd)
 }
 
 // SetVersionInfo sets the version information for the application
