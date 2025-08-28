@@ -71,12 +71,14 @@ func runWatch(cmd *cobra.Command, args []string) {
 	restartChan := make(chan bool, 1)
 	processChan := make(chan *exec.Cmd, 1)
 	stopChan := make(chan bool, 1)
+	killChan := make(chan bool, 1)
 
-	// Process management
+	// Process management with mutex-like behavior
 	var currentProcess *exec.Cmd
+	var isRestarting bool
 
 	// Start the initial command
-	go runCommand(command, restartChan, processChan, stopChan)
+	go runCommand(command, restartChan, processChan, stopChan, killChan)
 
 	// Handle file system events
 	go func() {
@@ -88,15 +90,19 @@ func runWatch(cmd *cobra.Command, args []string) {
 				}
 
 				// Only restart on Go file changes
-				if shouldRestart(event) {
+				if shouldRestart(event) && !isRestarting {
 					fmt.Printf("📝 File changed: %s\n", event.Name)
+					isRestarting = true
+
 					// Stop current process before restarting
 					if currentProcess != nil && currentProcess.Process != nil {
 						fmt.Println("🛑 Stopping current process for restart...")
+						killChan <- true
 						forceKillProcess(currentProcess)
-						// Wait a bit for process to fully terminate and port to be released
-						time.Sleep(500 * time.Millisecond)
+						// Wait longer for process to fully terminate and port to be released
+						time.Sleep(1 * time.Second)
 					}
+
 					select {
 					case restartChan <- true:
 					default:
@@ -118,6 +124,7 @@ func runWatch(cmd *cobra.Command, args []string) {
 			select {
 			case process := <-processChan:
 				currentProcess = process
+				isRestarting = false
 			case <-stopChan:
 				return
 			}
@@ -129,7 +136,7 @@ func runWatch(cmd *cobra.Command, args []string) {
 		for range restartChan {
 			time.Sleep(watchDelay)
 			fmt.Println("🔄 Restarting...")
-			go runCommand(command, restartChan, processChan, stopChan)
+			go runCommand(command, restartChan, processChan, stopChan, killChan)
 		}
 	}()
 
@@ -143,7 +150,7 @@ func runWatch(cmd *cobra.Command, args []string) {
 	watcher.Close()
 }
 
-func runCommand(command string, restartChan chan bool, processChan chan *exec.Cmd, stopChan chan bool) {
+func runCommand(command string, restartChan chan bool, processChan chan *exec.Cmd, stopChan chan bool, killChan chan bool) {
 	fmt.Printf("▶️  Running: %s\n", command)
 
 	// Split command for cross-platform compatibility
@@ -174,6 +181,12 @@ func runCommand(command string, restartChan chan bool, processChan chan *exec.Cm
 	select {
 	case <-stopChan:
 		fmt.Println("🛑 Stopping current process...")
+		if cmd.Process != nil {
+			forceKillProcess(cmd)
+		}
+		return
+	case <-killChan:
+		fmt.Println("🛑 Process killed for restart...")
 		if cmd.Process != nil {
 			forceKillProcess(cmd)
 		}
