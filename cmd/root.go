@@ -54,17 +54,31 @@ Usage:
 
 Available Commands:`)
 
-	for _, c := range cmd.Commands() {
-		if (!c.IsAvailableCommand() || c.Hidden) && c.Name() != "help" {
-			continue
-		}
-		fmt.Printf("  %-12s %s\n", c.Name(), c.Short)
-	}
+	printAvaibleCommands(cmd)
 
 	fmt.Println(`
 Flags:
   -h, --help      help for elsa
   -v, --version   version for elsa`)
+}
+
+func printAvaibleCommands(cmd *cobra.Command) {
+	maxLen := 0
+	for _, c := range cmd.Commands() {
+		if (!c.IsAvailableCommand() || c.Hidden) && c.Name() != "help" {
+			continue
+		}
+		if l := len(c.Name()); l > maxLen {
+			maxLen = l
+		}
+	}
+
+	for _, c := range cmd.Commands() {
+		if (!c.IsAvailableCommand() || c.Hidden) && c.Name() != "help" {
+			continue
+		}
+		fmt.Printf("  %-*s %s\n", maxLen+1, c.Name(), c.Short)
+	}
 }
 
 func customVersionTemplate() string {
