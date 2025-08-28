@@ -41,7 +41,7 @@ func createElsafile() error {
 	// Create default Elsafile content
 	content := `# Elsa - Engineer's Little Smart Assistant
 # This file defines custom commands for your project
-# Commands can be run using: elsa run command_name
+# Commands can be run using: elsa command_name or elsa run command_name
 
 # Build the project
 build:

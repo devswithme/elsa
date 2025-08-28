@@ -3,6 +3,8 @@ package elsafile
 import (
 	"fmt"
 	"strings"
+
+	"github.com/spf13/cobra"
 )
 
 // SimpleHandler handles unknown commands by checking Elsafile
@@ -14,6 +16,13 @@ type SimpleHandler struct {
 func NewSimpleHandler() *SimpleHandler {
 	return &SimpleHandler{
 		elsafileManager: NewManager("Elsafile"),
+	}
+}
+
+// NewSimpleHandlerWithRoot creates a new SimpleHandler instance with root command for dynamic built-in detection
+func NewSimpleHandlerWithRoot(rootCmd *cobra.Command) *SimpleHandler {
+	return &SimpleHandler{
+		elsafileManager: NewManagerWithRoot("Elsafile", rootCmd),
 	}
 }
 

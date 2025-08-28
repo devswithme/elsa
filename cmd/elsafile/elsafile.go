@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/spf13/cobra"
 )
 
 // Command represents a command defined in the Elsafile
@@ -17,8 +19,9 @@ type Command struct {
 
 // Manager handles parsing and execution of Elsafile commands
 type Manager struct {
-	commands map[string]*Command
-	filepath string
+	commands    map[string]*Command
+	filepath    string
+	rootCommand *cobra.Command
 }
 
 // NewManager creates a new Manager instance
@@ -26,6 +29,15 @@ func NewManager(filepath string) *Manager {
 	return &Manager{
 		commands: make(map[string]*Command),
 		filepath: filepath,
+	}
+}
+
+// NewManagerWithRoot creates a new Manager instance with root command for dynamic built-in detection
+func NewManagerWithRoot(filepath string, rootCmd *cobra.Command) *Manager {
+	return &Manager{
+		commands:    make(map[string]*Command),
+		filepath:    filepath,
+		rootCommand: rootCmd,
 	}
 }
 
@@ -140,7 +152,17 @@ func (em *Manager) ExecuteShellCommand(command string) error {
 
 // HasConflict checks if a command name conflicts with built-in commands
 func (em *Manager) HasConflict(name string) bool {
-	// List of built-in command names
+	// If we have root command, get built-in commands dynamically
+	if em.rootCommand != nil {
+		for _, cmd := range em.rootCommand.Commands() {
+			if cmd.Name() == name && !cmd.Hidden {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Fallback to static list if no root command available
 	builtinCommands := []string{
 		"init", "run", "list", "exec", "migrate", "watch", "help", "version",
 	}

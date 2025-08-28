@@ -24,7 +24,7 @@ var (
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				// Try to handle as Elsafile command
-				handler := elsafile.NewSimpleHandler()
+				handler := elsafile.NewSimpleHandlerWithRoot(cmd)
 				if err := handler.HandleUnknownCommand(args[0]); err != nil {
 					// If it's not an Elsafile command, show suggestions
 					suggestions := handler.SuggestCommands(args[0])
