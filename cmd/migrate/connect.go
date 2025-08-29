@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/risoftinc/elsa/constants"
 	"github.com/risoftinc/elsa/internal/database"
 	"github.com/spf13/cobra"
 )
@@ -50,15 +51,15 @@ func runConnect(cmd *cobra.Command, args []string) error {
 			config.Charset = parsed.Charset
 		}
 
-		fmt.Printf("🔗 Using connection string from flag:\n")
-		fmt.Printf("   Connection: %s\n", config.ConnectionString)
-		fmt.Printf("   Driver:     %s\n", config.Driver)
-		fmt.Printf("   Host:       %s\n", config.Host)
-		fmt.Printf("   Port:       %s\n", config.Port)
-		fmt.Printf("   Database:   %s\n", config.Database)
-		fmt.Printf("   Username:   %s\n", config.Username)
+		fmt.Printf(constants.InfoUsingConnectionFlag)
+		fmt.Printf(constants.ConnectionInfoFormat, config.ConnectionString)
+		fmt.Printf(constants.DriverInfoFormat, config.Driver)
+		fmt.Printf(constants.HostInfoFormat, config.Host)
+		fmt.Printf(constants.PortInfoFormat, config.Port)
+		fmt.Printf(constants.DatabaseInfoFormat, config.Database)
+		fmt.Printf(constants.UsernameInfoFormat, config.Username)
 		if config.Password != "" {
-			fmt.Printf("   Password:  %s\n", strings.Repeat("*", len(config.Password)))
+			fmt.Printf(constants.PasswordInfoFormat, strings.Repeat("*", len(config.Password)))
 		}
 	} else {
 		// Try to load from .env file first, then interactive if not found
@@ -66,35 +67,35 @@ func runConnect(cmd *cobra.Command, args []string) error {
 
 		// Check if we have a valid connection string from .env
 		if config.ConnectionString != "" {
-			fmt.Printf("📁 Loaded configuration from .env file:\n")
-			fmt.Printf("   Connection: %s\n", config.ConnectionString)
-			fmt.Printf("   Driver:     %s\n", config.Driver)
-			fmt.Printf("   Host:       %s\n", config.Host)
-			fmt.Printf("   Port:       %s\n", config.Port)
-			fmt.Printf("   Database:   %s\n", config.Database)
-			fmt.Printf("   Username:   %s\n", config.Username)
+			fmt.Printf(constants.InfoLoadedFromEnv)
+			fmt.Printf(constants.ConnectionInfoFormat, config.ConnectionString)
+			fmt.Printf(constants.DriverInfoFormat, config.Driver)
+			fmt.Printf(constants.HostInfoFormat, config.Host)
+			fmt.Printf(constants.PortInfoFormat, config.Port)
+			fmt.Printf(constants.DatabaseInfoFormat, config.Database)
+			fmt.Printf(constants.UsernameInfoFormat, config.Username)
 			if config.Password != "" {
-				fmt.Printf("   Password:  %s\n", strings.Repeat("*", len(config.Password)))
+				fmt.Printf(constants.PasswordInfoFormat, strings.Repeat("*", len(config.Password)))
 			}
 		} else {
 			// No .env file or invalid config, use interactive
-			fmt.Printf("ℹ️  No .env file found or invalid configuration\n")
+			fmt.Printf(constants.InfoNoEnvFile)
 			config = getInteractiveConfig()
 		}
 	}
 
 	// Test connection
-	fmt.Printf("\n🔌 Testing database connection...\n")
+	fmt.Printf("\n%s", constants.InfoTestingConnection)
 	db, err := database.Connect(config)
 	if err != nil {
 		return fmt.Errorf("❌ Connection failed: %v", err, err)
 	}
 
-	fmt.Printf("✅ Successfully connected to database!\n")
-	fmt.Printf("   Connection: %s\n", config.GetConnectionString())
+	fmt.Printf(constants.SuccessConnected)
+	fmt.Printf(constants.ConnectionInfoFormat, config.GetConnectionString())
 
 	// Test migration table
-	fmt.Printf("\n📋 Ensuring migration table exists...\n")
+	fmt.Printf("\n%s", constants.InfoEnsuringTable)
 	executor := database.NewMigrationExecutor(db)
 	if err := executor.EnsureMigrationTable(); err != nil {
 		return fmt.Errorf("❌ Failed to create migration table: %v", err)

@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/risoftinc/elsa/constants"
 	"github.com/spf13/cobra"
 )
 
@@ -38,20 +39,20 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	// Determine which migration types to show
 	showTypes := []string{}
 	if showDDL {
-		showTypes = append(showTypes, "ddl")
+		showTypes = append(showTypes, constants.MigrationTypeDDL)
 	} else if showDML {
-		showTypes = append(showTypes, "dml")
+		showTypes = append(showTypes, constants.MigrationTypeDML)
 	} else {
 		// Show both if no specific type specified
-		showTypes = []string{"ddl", "dml"}
+		showTypes = []string{constants.MigrationTypeDDL, constants.MigrationTypeDML}
 	}
 
-	fmt.Printf("📊 Migration Status Overview\n")
-	fmt.Printf("==================================================\n\n")
+	fmt.Printf(constants.StatusOverviewHeader)
+	fmt.Printf(constants.StatusOverviewSeparator)
 
 	for _, migrationType := range showTypes {
 		if err := showMigrationStatus(migrationType); err != nil {
-			return fmt.Errorf("failed to show %s migration status: %v", migrationType, err)
+			return fmt.Errorf(constants.ErrFailedShowStatus, migrationType, err)
 		}
 		fmt.Println()
 	}
@@ -63,20 +64,20 @@ func showMigrationStatus(migrationType string) error {
 	// Get available migrations
 	availableMigrations, err := GetAvailableMigrationsWithPath(migrationType, statusCustomPath)
 	if err != nil {
-		return fmt.Errorf("failed to get available migrations: %v", err)
+		return fmt.Errorf(constants.ErrFailedShowStatus, migrationType, err)
 	}
 
 	// Get applied migrations from database
 	appliedMigrations, err := getAppliedMigrations(migrationType)
 	if err != nil {
 		// If database connection fails, show only file-based status
-		fmt.Printf("⚠️  Warning: Could not connect to database: %v\n", err)
-		fmt.Printf("   Showing file-based status only (no applied/pending info)\n\n")
+		fmt.Printf(constants.InfoWarningDBConnect, err)
+		fmt.Printf(constants.InfoShowingFileBased)
 
 		// Display available migrations without status
-		fmt.Printf("🔧 %s Migrations:\n", strings.ToUpper(migrationType))
-		fmt.Printf("   ID                 Name\n")
-		fmt.Printf("   ----------------------------------------\n")
+		fmt.Printf(constants.StatusDDLHeader, strings.ToUpper(migrationType))
+		fmt.Printf(constants.StatusTableHeader)
+		fmt.Printf(constants.StatusTableSeparator)
 
 		for _, migration := range availableMigrations {
 			displayID := migration.ID
@@ -86,7 +87,7 @@ func showMigrationStatus(migrationType string) error {
 			fmt.Printf("   %s  %s\n", displayID, migration.Name)
 		}
 
-		fmt.Printf("\n   Summary: %d total (database status unavailable)\n", len(availableMigrations))
+		fmt.Printf(constants.InfoDatabaseStatusUnavailable, len(availableMigrations))
 		return nil
 	}
 
@@ -114,9 +115,9 @@ func showMigrationStatus(migrationType string) error {
 
 	// Display each migration
 	for _, migration := range availableMigrations {
-		status := "❌ Pending"
+		status := constants.StatusPending
 		if appliedMap[migration.ID] {
-			status = "✅ Applied"
+			status = constants.StatusApplied
 		}
 
 		// Format ID for display (ensure consistent width)

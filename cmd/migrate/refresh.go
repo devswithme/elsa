@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/risoftinc/elsa/constants"
 	"github.com/spf13/cobra"
 )
 
@@ -33,35 +34,35 @@ func runRefresh(cmd *cobra.Command, args []string) error {
 	migrationType := args[0]
 
 	// Validate migration type
-	if migrationType != "ddl" && migrationType != "dml" {
-		return fmt.Errorf("migration type must be 'ddl' or 'dml', got: %s", migrationType)
+	if migrationType != constants.MigrationTypeDDL && migrationType != constants.MigrationTypeDML {
+		return fmt.Errorf(constants.ErrInvalidMigrationType, migrationType)
 	}
 
-	fmt.Printf("🔄 Refreshing all %s migrations...\n", strings.ToUpper(migrationType))
-	fmt.Printf("==================================================\n\n")
+	fmt.Printf(constants.RefreshHeader, strings.ToUpper(migrationType))
+	fmt.Printf(constants.RefreshSeparator)
 
 	// Step 1: Rollback all migrations
-	fmt.Printf("📤 Step 1: Rolling back all applied %s migrations...\n", strings.ToUpper(migrationType))
+	fmt.Printf(constants.InfoStep1Rollback, strings.ToUpper(migrationType))
 
 	// Call rollback directly with connection string
 	if err := rollbackAllMigrations(migrationType, refreshCustomPath, refreshConnection); err != nil {
-		return fmt.Errorf("failed to rollback migrations: %v", err)
+		return fmt.Errorf(constants.ErrFailedRollbackAll, err)
 	}
 
-	fmt.Printf("✅ All %s migrations rolled back successfully\n\n", strings.ToUpper(migrationType))
+	fmt.Printf(constants.SuccessAllRolledBack, strings.ToUpper(migrationType))
 
 	// Step 2: Apply all migrations again
-	fmt.Printf("📥 Step 2: Applying all %s migrations...\n", strings.ToUpper(migrationType))
+	fmt.Printf(constants.InfoStep2Apply, strings.ToUpper(migrationType))
 
 	// Call apply directly with connection string
 	if err := applyAllMigrations(migrationType, refreshCustomPath, refreshConnection); err != nil {
-		return fmt.Errorf("failed to apply migrations: %v", err)
+		return fmt.Errorf(constants.ErrFailedApplyAll, err)
 	}
 
-	fmt.Printf("✅ All %s migrations applied successfully\n\n", strings.ToUpper(migrationType))
+	fmt.Printf(constants.SuccessAllAppliedAgain, strings.ToUpper(migrationType))
 
-	fmt.Printf("🎉 Successfully refreshed all %s migrations!\n", strings.ToUpper(migrationType))
-	fmt.Printf("   All migrations have been rolled back and reapplied.\n")
+	fmt.Printf(constants.SuccessRefreshed, strings.ToUpper(migrationType))
+	fmt.Printf(constants.RefreshSuccessMessage)
 
 	return nil
 }

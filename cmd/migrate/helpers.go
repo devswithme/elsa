@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/risoftinc/elsa/constants"
 	"github.com/risoftinc/elsa/internal/database"
 )
 
@@ -18,7 +19,7 @@ func getAppliedMigrationsWithConnection(migrationType, connectionString string) 
 	if connectionString != "" {
 		config = database.ParseConnectionString(connectionString)
 		if config == nil {
-			return nil, fmt.Errorf("invalid connection string: %s", connectionString)
+			return nil, fmt.Errorf(constants.ErrInvalidConnectionString, connectionString)
 		}
 	} else {
 		// Get database configuration using helper function
@@ -31,7 +32,7 @@ func getAppliedMigrationsWithConnection(migrationType, connectionString string) 
 	// Connect to database
 	db, err := database.Connect(config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %v", err)
+		return nil, fmt.Errorf(constants.ErrFailedConnectDB, err)
 	}
 
 	// Get migration executor
@@ -39,7 +40,7 @@ func getAppliedMigrationsWithConnection(migrationType, connectionString string) 
 
 	// Ensure migration table exists
 	if err := executor.EnsureMigrationTable(); err != nil {
-		return nil, fmt.Errorf("failed to ensure migration table: %v", err)
+		return nil, fmt.Errorf(constants.ErrFailedEnsureTable, err)
 	}
 
 	// Get applied migrations
@@ -51,7 +52,7 @@ func applyMigrationWithConnection(migration Migration, migrationType, connection
 	// Read migration file
 	content, err := os.ReadFile(migration.Path)
 	if err != nil {
-		return fmt.Errorf("failed to read migration file: %v", err)
+		return fmt.Errorf(constants.ErrFailedReadFile, err)
 	}
 
 	var config *database.DatabaseConfig
@@ -60,7 +61,7 @@ func applyMigrationWithConnection(migration Migration, migrationType, connection
 	if connectionString != "" {
 		config = database.ParseConnectionString(connectionString)
 		if config == nil {
-			return fmt.Errorf("invalid connection string: %s", connectionString)
+			return fmt.Errorf(constants.ErrInvalidConnectionString, connectionString)
 		}
 	} else {
 		// Load database configuration from .env
@@ -70,7 +71,7 @@ func applyMigrationWithConnection(migration Migration, migrationType, connection
 	// Connect to database
 	db, err := database.Connect(config)
 	if err != nil {
-		return fmt.Errorf("failed to connect to database: %v", err)
+		return fmt.Errorf(constants.ErrFailedConnectDB, err)
 	}
 
 	// Get migration executor
@@ -78,23 +79,23 @@ func applyMigrationWithConnection(migration Migration, migrationType, connection
 
 	// Ensure migration table exists
 	if err := executor.EnsureMigrationTable(); err != nil {
-		return fmt.Errorf("failed to ensure migration table: %v", err)
+		return fmt.Errorf(constants.ErrFailedEnsureTable, err)
 	}
 
 	// Execute migration
 	startTime := time.Now()
 	if err := executor.ExecuteMigration(string(content), migrationType); err != nil {
-		return fmt.Errorf("failed to execute migration: %v", err)
+		return fmt.Errorf(constants.ErrFailedExecuteMigration, err)
 	}
 	executionTime := time.Since(startTime).Milliseconds()
 
 	// Record migration as applied
 	checksum := database.GetMigrationChecksum(string(content))
 	if err := executor.RecordMigration(migration.ID, migration.Name, migrationType, checksum, executionTime); err != nil {
-		return fmt.Errorf("failed to record migration: %v", err)
+		return fmt.Errorf(constants.ErrFailedRecordMigration, err)
 	}
 
-	fmt.Printf("   ✅ Executed in %dms\n", executionTime)
+	fmt.Printf(constants.SuccessExecuted, executionTime)
 
 	return nil
 }
@@ -102,11 +103,11 @@ func applyMigrationWithConnection(migration Migration, migrationType, connection
 // rollbackMigrationWithConnection rolls back a migration using connection string
 func rollbackMigrationWithConnection(migration Migration, migrationType, connectionString string) error {
 	// Read down migration file
-	downFilePath := strings.Replace(migration.Path, ".up.sql", ".down.sql", 1)
+	downFilePath := strings.Replace(migration.Path, constants.UpMigrationExtension, constants.DownMigrationExtension, 1)
 
 	content, err := os.ReadFile(downFilePath)
 	if err != nil {
-		return fmt.Errorf("failed to read down migration file: %v", err)
+		return fmt.Errorf(constants.ErrFailedReadFile, err)
 	}
 
 	var config *database.DatabaseConfig
@@ -129,7 +130,7 @@ func rollbackMigrationWithConnection(migration Migration, migrationType, connect
 	// Connect to database
 	db, err := database.Connect(config)
 	if err != nil {
-		return fmt.Errorf("failed to connect to database: %v", err)
+		return fmt.Errorf(constants.ErrFailedConnectDB, err)
 	}
 
 	// Get migration executor
@@ -137,22 +138,22 @@ func rollbackMigrationWithConnection(migration Migration, migrationType, connect
 
 	// Ensure migration table exists
 	if err := executor.EnsureMigrationTable(); err != nil {
-		return fmt.Errorf("failed to ensure migration table: %v", err)
+		return fmt.Errorf(constants.ErrFailedEnsureTable, err)
 	}
 
 	// Execute rollback migration
 	startTime := time.Now()
 	if err := executor.ExecuteMigration(string(content), migrationType); err != nil {
-		return fmt.Errorf("failed to execute rollback migration: %v", err)
+		return fmt.Errorf(constants.ErrFailedRollbackMigration, err)
 	}
 	executionTime := time.Since(startTime).Milliseconds()
 
 	// Remove migration record
 	if err := executor.RemoveMigration(migration.ID); err != nil {
-		return fmt.Errorf("failed to remove migration record: %v", err)
+		return fmt.Errorf(constants.ErrFailedRemoveRecord, err)
 	}
 
-	fmt.Printf("   ✅ Rolled back in %dms\n", executionTime)
+	fmt.Printf(constants.SuccessRolledBack, executionTime)
 
 	return nil
 }

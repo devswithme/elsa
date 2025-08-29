@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/risoftinc/elsa/constants"
 	"gorm.io/gorm"
 )
 
@@ -21,7 +22,7 @@ type MigrationRecord struct {
 
 // TableName specifies the table name for MigrationRecord
 func (MigrationRecord) TableName() string {
-	return "migrations"
+	return constants.MigrationsTableName
 }
 
 // MigrationExecutor handles migration execution
@@ -38,7 +39,7 @@ func NewMigrationExecutor(db *gorm.DB) *MigrationExecutor {
 func (me *MigrationExecutor) EnsureMigrationTable() error {
 	// Check if table already exists by trying to query it
 	var count int64
-	err := me.db.Table("migrations").Count(&count).Error
+	err := me.db.Table(constants.MigrationsTableName).Count(&count).Error
 
 	if err == nil {
 		// Table already exists, no need to create
@@ -52,47 +53,15 @@ func (me *MigrationExecutor) EnsureMigrationTable() error {
 	var createTableSQL string
 
 	switch dbType {
-	case "mysql":
-		createTableSQL = `CREATE TABLE IF NOT EXISTS migrations (
-			id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-			migration_id VARCHAR(255) NOT NULL UNIQUE,
-			name VARCHAR(255) NOT NULL,
-			type VARCHAR(10) NOT NULL,
-			applied_at DATETIME(3) NOT NULL,
-			checksum VARCHAR(64) NOT NULL,
-			execution_time BIGINT NOT NULL
-		)`
-	case "postgres":
-		createTableSQL = `CREATE TABLE IF NOT EXISTS migrations (
-			id BIGSERIAL PRIMARY KEY,
-			migration_id VARCHAR(255) NOT NULL UNIQUE,
-			name VARCHAR(255) NOT NULL,
-			type VARCHAR(10) NOT NULL,
-			applied_at TIMESTAMP NOT NULL,
-			checksum VARCHAR(64) NOT NULL,
-			execution_time BIGINT NOT NULL
-		)`
-	case "sqlite":
-		createTableSQL = `CREATE TABLE IF NOT EXISTS migrations (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			migration_id TEXT NOT NULL UNIQUE,
-			name TEXT NOT NULL,
-			type TEXT NOT NULL,
-			applied_at DATETIME NOT NULL,
-			checksum TEXT NOT NULL,
-			execution_time INTEGER NOT NULL
-		)`
+	case constants.DriverMySQL:
+		createTableSQL = constants.MySQLCreateTableSQL
+	case constants.DriverPostgres:
+		createTableSQL = constants.PostgresCreateTableSQL
+	case constants.DriverSQLite:
+		createTableSQL = constants.SQLiteCreateTableSQL
 	default:
 		// Fallback to generic SQL that should work on most databases
-		createTableSQL = `CREATE TABLE IF NOT EXISTS migrations (
-			id BIGINT AUTO_INCREMENT PRIMARY KEY,
-			migration_id VARCHAR(255) NOT NULL UNIQUE,
-			name VARCHAR(255) NOT NULL,
-			type VARCHAR(10) NOT NULL,
-			applied_at TIMESTAMP NOT NULL,
-			checksum VARCHAR(64) NOT NULL,
-			execution_time BIGINT NOT NULL
-		)`
+		createTableSQL = constants.GenericCreateTableSQL
 	}
 
 	return me.db.Exec(createTableSQL).Error
@@ -101,8 +70,8 @@ func (me *MigrationExecutor) EnsureMigrationTable() error {
 // GetAppliedMigrations retrieves all applied migrations
 func (me *MigrationExecutor) GetAppliedMigrations(migrationType string) ([]string, error) {
 	var records []MigrationRecord
-	if err := me.db.Where("type = ?", migrationType).Find(&records).Error; err != nil {
-		return nil, fmt.Errorf("failed to get applied migrations: %v", err)
+	if err := me.db.Where(constants.TypeField+" = ?", migrationType).Find(&records).Error; err != nil {
+		return nil, fmt.Errorf(constants.ErrFailedGetMigrations, err)
 	}
 
 	var migrationIDs []string
@@ -125,7 +94,7 @@ func (me *MigrationExecutor) RecordMigration(migrationID, name, migrationType, c
 	}
 
 	if err := me.db.Create(&record).Error; err != nil {
-		return fmt.Errorf("failed to record migration: %v", err)
+		return fmt.Errorf(constants.ErrFailedRecord, err)
 	}
 
 	return nil
@@ -133,8 +102,8 @@ func (me *MigrationExecutor) RecordMigration(migrationID, name, migrationType, c
 
 // RemoveMigration removes a migration record (for rollback)
 func (me *MigrationExecutor) RemoveMigration(migrationID string) error {
-	if err := me.db.Where("migration_id = ?", migrationID).Delete(&MigrationRecord{}).Error; err != nil {
-		return fmt.Errorf("failed to remove migration record: %v", err)
+	if err := me.db.Where(constants.MigrationIDField+" = ?", migrationID).Delete(&MigrationRecord{}).Error; err != nil {
+		return fmt.Errorf(constants.ErrFailedRemove, err)
 	}
 
 	return nil
@@ -153,7 +122,7 @@ func (me *MigrationExecutor) ExecuteMigration(sqlContent string, migrationType s
 
 		// Execute the SQL statement
 		if err := me.db.Exec(statement).Error; err != nil {
-			return fmt.Errorf("failed to execute statement %d: %v\nSQL: %s", i+1, err, statement)
+			return fmt.Errorf(constants.ErrFailedExecute, i+1, err, statement)
 		}
 	}
 
