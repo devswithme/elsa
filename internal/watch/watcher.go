@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/risoftinc/elsa/constants"
 )
 
 // FileWatcher handles file system watching with configurable options
@@ -26,11 +28,8 @@ type WatchOptions struct {
 // DefaultWatchOptions returns sensible defaults for Go development
 func DefaultWatchOptions() *WatchOptions {
 	return &WatchOptions{
-		Extensions: []string{".go"},
-		ExcludeDirs: []string{
-			".git", "vendor", "tmp", "temp", "build", "dist",
-			"bin", "pkg", ".vscode", ".idea", "coverage", "testdata",
-		},
+		Extensions:   []string{constants.DefaultWatchExtensions},
+		ExcludeDirs:  strings.Split(constants.DefaultWatchExcludeDirs, ","),
 		OnFileChange: nil, // No default callback to avoid duplication
 	}
 }
@@ -64,7 +63,7 @@ func (fw *FileWatcher) AddDirectoriesToWatch() error {
 				}
 			}
 			if err := fw.watcher.Add(path); err != nil {
-				fmt.Printf("⚠️  Warning: Could not watch directory %s: %v\n", path, err)
+				fmt.Printf(constants.MsgWatchWarning+"\n", path, err)
 			}
 		}
 		return nil
