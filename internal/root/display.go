@@ -18,7 +18,7 @@ func NewDisplayHelper() *DisplayHelper {
 
 // ShowRootHelp displays the custom root help template
 func (h *DisplayHelper) ShowRootHelp(cmd *cobra.Command, version string) {
-	fmt.Println(h.getBanner(version) + constants.UsageText)
+	fmt.Println(h.getBanner(version) + "\n\n" + constants.UsageText)
 	h.printAvailableCommands(cmd)
 	fmt.Printf("\n%s\n", constants.HelpText)
 }
