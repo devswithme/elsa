@@ -3,7 +3,7 @@ package main
 // Set configures dependency data that will be used for building.
 // It accepts variadic arguments following the pattern: pkg.funcname
 // This function sets up the necessary data structures and dependencies
-// that will be parsed and used by the Build function.
+// that will be parsed and used by the Generate function.
 func Set(node ...any) bool {
 	return true
 }
