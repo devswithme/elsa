@@ -36,6 +36,7 @@ func (tg *TemplateGenerator) CreateDefaultElsafile() error {
 // GetDefaultTemplate returns the default Elsafile template content
 func (tg *TemplateGenerator) GetDefaultTemplate() string {
 	return constants.DefaultTemplateHeader + "\n\n" +
+		constants.DefaultInstallToolsElsaCommand + "\n\n" +
 		constants.DefaultBuildCommand + "\n\n" +
 		constants.DefaultTestCommand + "\n\n" +
 		constants.DefaultCleanCommand + "\n\n" +

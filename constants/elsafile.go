@@ -97,6 +97,10 @@ const (
 # This file defines custom commands for your project
 # Commands can be run using: elsa command_name or elsa run command_name`
 
+	DefaultInstallToolsElsaCommand = `# Install elsa cli
+install-tools:
+	go install github.com/risoftinc/elsa@latest`
+
 	// DefaultBuildCommand is the default build command template
 	DefaultBuildCommand = `# Build the project
 build:
