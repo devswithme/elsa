@@ -3,6 +3,8 @@ package elsafile
 import (
 	"os"
 	"os/exec"
+
+	"github.com/risoftinc/elsa/constants"
 )
 
 // ShellExecutor handles shell command execution with cross-platform support
@@ -20,11 +22,11 @@ func (se *ShellExecutor) ExecuteCommand(command string) error {
 
 	// Detect OS and use appropriate shell
 	if se.isWindows() {
-		shell = "cmd"
-		args = []string{"/C", command}
+		shell = constants.WindowsShell
+		args = []string{constants.WindowsShellArgs, command}
 	} else {
-		shell = "/bin/sh"
-		args = []string{"-c", command}
+		shell = constants.UnixShell
+		args = []string{constants.UnixShellArgs, command}
 	}
 
 	cmd := exec.Command(shell, args...)
@@ -42,11 +44,11 @@ func (se *ShellExecutor) ExecuteCommandWithOutput(command string) (string, error
 
 	// Detect OS and use appropriate shell
 	if se.isWindows() {
-		shell = "cmd"
-		args = []string{"/C", command}
+		shell = constants.WindowsShell
+		args = []string{constants.WindowsShellArgs, command}
 	} else {
-		shell = "/bin/sh"
-		args = []string{"-c", command}
+		shell = constants.UnixShell
+		args = []string{constants.UnixShellArgs, command}
 	}
 
 	cmd := exec.Command(shell, args...)
@@ -61,11 +63,11 @@ func (se *ShellExecutor) ExecuteCommandSilently(command string) error {
 
 	// Detect OS and use appropriate shell
 	if se.isWindows() {
-		shell = "cmd"
-		args = []string{"/C", command}
+		shell = constants.WindowsShell
+		args = []string{constants.WindowsShellArgs, command}
 	} else {
-		shell = "/bin/sh"
-		args = []string{"-c", command}
+		shell = constants.UnixShell
+		args = []string{constants.UnixShellArgs, command}
 	}
 
 	cmd := exec.Command(shell, args...)
@@ -80,9 +82,9 @@ func (se *ShellExecutor) isWindows() bool {
 // GetShellInfo returns information about the current shell
 func (se *ShellExecutor) GetShellInfo() (string, []string) {
 	if se.isWindows() {
-		return "cmd", []string{"/C"}
+		return constants.WindowsShell, []string{constants.WindowsShellArgs}
 	}
-	return "/bin/sh", []string{"-c"}
+	return constants.UnixShell, []string{constants.UnixShellArgs}
 }
 
 // ValidateCommand checks if a command can be executed

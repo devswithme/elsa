@@ -95,11 +95,11 @@ func (h *SimpleHandler) GetSuggestionMessage(commandName string) string {
 		return fmt.Sprintf("💡 No similar commands found for '%s'", commandName)
 	}
 
-	msg := fmt.Sprintf("💡 Did you mean one of these commands?\n")
+	msg := "💡 Did you mean one of these commands?\n"
 	for _, suggestion := range suggestions {
 		msg += fmt.Sprintf("   %s\n", suggestion)
 	}
-	msg += fmt.Sprintf("\n💡 Use 'elsa run command_name' to execute Elsafile commands")
+	msg += "\n💡 Use 'elsa run command_name' to execute Elsafile commands"
 
 	return msg
 }
