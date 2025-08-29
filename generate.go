@@ -8,9 +8,9 @@ func Set(node ...any) bool {
 	return true
 }
 
-// Build performs the building process based on the data set by Set function.
+// Generate performs the building process based on the data set by Set function.
 // It parses the configured dependencies and executes the building logic
 // according to the previously set configuration.
-func Build(node ...any) bool {
+func Generate(node ...any) bool {
 	return true
 }
