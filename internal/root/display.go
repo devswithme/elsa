@@ -20,7 +20,7 @@ func NewDisplayHelper() *DisplayHelper {
 func (h *DisplayHelper) ShowRootHelp(cmd *cobra.Command, version string) {
 	fmt.Println(h.getBanner(version) + constants.UsageText)
 	h.printAvailableCommands(cmd)
-	fmt.Printf("\nFlags:\n%s\n", constants.HelpText)
+	fmt.Printf("\n%s\n", constants.HelpText)
 }
 
 // ShowSuggestions displays command suggestions when an unknown command is entered

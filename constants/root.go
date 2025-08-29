@@ -9,7 +9,8 @@ const (
 	RootShort = "Elsa - Engineer's Little Smart Assistant"
 
 	// Help text
-	HelpText = `-h, --help      help for elsa
+	HelpText = `Flags:
+  -h, --help      help for elsa
   -v, --version   version for elsa`
 
 	// Usage text
