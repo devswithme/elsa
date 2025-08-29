@@ -3,11 +3,12 @@ package cmd
 import (
 	"fmt"
 	"runtime"
-	"strings"
 
 	"github.com/risoftinc/elsa/cmd/elsafile"
 	"github.com/risoftinc/elsa/cmd/migrate"
 	"github.com/risoftinc/elsa/cmd/watch"
+	"github.com/risoftinc/elsa/constants"
+	"github.com/risoftinc/elsa/internal/root"
 	"github.com/spf13/cobra"
 )
 
@@ -18,36 +19,12 @@ var (
 
 	// rootCmd represents the base command when called without any subcommands
 	rootCmd = &cobra.Command{
-		Use:   "elsa",
-		Short: "Elsa - Engineer’s Little Smart Assistant",
+		Use:   constants.RootUse,
+		Short: constants.RootShort,
 		Args:  cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) > 0 {
-				// Check if the first argument is a flag (starts with -)
-				if strings.HasPrefix(args[0], "-") {
-					// This is a flag, let cobra handle it normally
-					return nil
-				}
-
-				// Try to handle as Elsafile command
-				handler := elsafile.NewSimpleHandlerWithRoot(cmd)
-				if err := handler.HandleUnknownCommand(args[0]); err != nil {
-					// If it's not an Elsafile command, show suggestions
-					suggestions := handler.SuggestCommands(args[0])
-					if len(suggestions) > 0 {
-						fmt.Printf("💡 Did you mean one of these commands?\n")
-						for _, suggestion := range suggestions {
-							fmt.Printf("  elsa %s\n", suggestion)
-						}
-						fmt.Println()
-					}
-					return err
-				}
-				return nil
-			}
-
-			customRootTemplate(cmd)
-			return nil
+			handler := root.NewCommandHandler()
+			return handler.HandleRootCommand(cmd, args, version)
 		},
 	}
 )
@@ -68,7 +45,6 @@ func init() {
 	rootCmd.AddCommand(elsafile.InitCmd)
 	rootCmd.AddCommand(elsafile.RunCmd)
 	rootCmd.AddCommand(elsafile.ListCmd)
-
 }
 
 // SetVersionInfo sets the version information for the application
@@ -76,63 +52,7 @@ func SetVersionInfo(v string) {
 	version = v
 	// Override the version command to use our version info
 	rootCmd.Version = version
-	rootCmd.SetVersionTemplate(customVersionTemplate())
-}
 
-func customRootTemplate(cmd *cobra.Command) {
-	fmt.Println(getBanner(version) + `
-		
-Usage:
-  elsa [flags]
-  elsa [command]
-
-Available Commands:`)
-
-	printAvaibleCommands(cmd)
-
-	fmt.Println(`
-Flags:
-  -h, --help      help for elsa
-  -v, --version   version for elsa`)
-}
-
-func printAvaibleCommands(cmd *cobra.Command) {
-	maxLen := 0
-	for _, c := range cmd.Commands() {
-		if (!c.IsAvailableCommand() || c.Hidden) && c.Name() != "help" {
-			continue
-		}
-		if l := len(c.Name()); l > maxLen {
-			maxLen = l
-		}
-	}
-
-	for _, c := range cmd.Commands() {
-		if (!c.IsAvailableCommand() || c.Hidden) && c.Name() != "help" {
-			continue
-		}
-		fmt.Printf("  %-*s %s\n", maxLen+1, c.Name(), c.Short)
-	}
-}
-
-func customVersionTemplate() string {
-	return fmt.Sprintf("ELSA v%s (CLI)\ngo version %s %s\nLearn more at: https://risoftinc.com\n",
-		version, goVersion, platform,
-	)
-}
-
-func getBanner(v string) string {
-	return fmt.Sprintf(`Developer productivity toolkit for Go.
-      ___           ___       ___           ___     
-     /\  \         /\__\     /\  \         /\  \    
-    /::\  \       /:/  /    /::\  \       /::\  \   
-   /:/\:\  \     /:/  /    /:/\ \  \     /:/\:\  \  
-  /::\~\:\  \   /:/  /    _\:\~\ \  \   /::\~\:\  \ 
- /:/\:\ \:\__\ /:/__/    /\ \:\ \ \__\ /:/\:\ \:\__\
- \:\~\:\ \/__/ \:\  \    \:\ \:\ \/__/ \/__\:\/:/  /
-  \:\ \:\__\    \:\  \    \:\ \:\__\        \::/  / 
-   \:\ \/__/     \:\  \    \:\/:/  /        /:/  /  
-    \:\__\        \:\__\    \::/  /        /:/  /   
-     \/__/         \/__/     \/__/         \/__/    V %s
-(migration, scaffolding, project runner and task automation)`, v)
+	displayHelper := root.NewDisplayHelper()
+	rootCmd.SetVersionTemplate(displayHelper.GetVersionTemplate(version, goVersion, platform))
 }
