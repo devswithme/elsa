@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/risoftinc/elsa/constants"
+	"github.com/spf13/cobra"
 )
 
 // ConflictHandler handles command conflicts between built-in and Elsafile commands
@@ -20,6 +21,14 @@ func NewConflictHandler() *ConflictHandler {
 
 // NewConflictHandlerWithManager creates a new ConflictHandler instance with a specific manager
 func NewConflictHandlerWithManager(manager *Manager) *ConflictHandler {
+	return &ConflictHandler{
+		elsafileManager: manager,
+	}
+}
+
+// NewConflictHandlerWithRoot creates a new ConflictHandler instance with root command for dynamic built-in detection
+func NewConflictHandlerWithRoot(rootCmd *cobra.Command) *ConflictHandler {
+	manager := NewManagerWithRoot(constants.DefaultElsafileName, rootCmd)
 	return &ConflictHandler{
 		elsafileManager: manager,
 	}

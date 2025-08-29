@@ -19,7 +19,7 @@ Examples:
   elsa list --conflicts  # Show only conflicting commands`,
 	Run: func(cmd *cobra.Command, args []string) {
 		showConflicts, _ := cmd.Flags().GetBool("conflicts")
-		if err := listElsafileCommands(showConflicts); err != nil {
+		if err := listElsafileCommands(cmd.Root(), showConflicts); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
@@ -30,8 +30,8 @@ func init() {
 	ListCmd.Flags().BoolP("conflicts", "c", false, "Show only commands that conflict with built-in commands")
 }
 
-func listElsafileCommands(showConflictsOnly bool) error {
-	commandLister := elsafile.NewCommandLister()
+func listElsafileCommands(rootCmd *cobra.Command, showConflictsOnly bool) error {
+	commandLister := elsafile.NewCommandListerWithRoot(rootCmd)
 
 	if showConflictsOnly {
 		return commandLister.ListConflictingCommands()

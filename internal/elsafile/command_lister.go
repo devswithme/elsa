@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/risoftinc/elsa/constants"
+	"github.com/spf13/cobra"
 )
 
 // CommandLister handles listing and displaying Elsafile commands
@@ -23,6 +24,14 @@ func NewCommandLister() *CommandLister {
 func NewCommandListerWithHandler(handler *ConflictHandler) *CommandLister {
 	return &CommandLister{
 		conflictHandler: handler,
+	}
+}
+
+// NewCommandListerWithRoot creates a new CommandLister instance with root command for dynamic built-in detection
+func NewCommandListerWithRoot(rootCmd *cobra.Command) *CommandLister {
+	conflictHandler := NewConflictHandlerWithRoot(rootCmd)
+	return &CommandLister{
+		conflictHandler: conflictHandler,
 	}
 }
 
