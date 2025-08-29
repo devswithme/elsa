@@ -55,4 +55,31 @@ const (
 
 	// WaveEmoji is the emoji used for goodbye messages
 	WaveEmoji = "👋"
+
+	// NumberEmoji is the emoji used for sequential/format information
+	NumberEmoji = "🔢"
+
+	// CalendarEmoji is the emoji used for timestamp/date information
+	CalendarEmoji = "📅"
+
+	// LinkEmoji is the emoji used for connection/linking
+	LinkEmoji = "🔗"
+
+	// PlugEmoji is the emoji used for connection/testing
+	PlugEmoji = "🔌"
+
+	// WrenchEmoji is the emoji used for tools/configuration
+	WrenchEmoji = "🔧"
+
+	// OutboxEmoji is the emoji used for step 1/rollback operations
+	OutboxEmoji = "📤"
+
+	// InboxEmoji is the emoji used for step 2/apply operations
+	InboxEmoji = "📥"
+
+	// FloppyDiskEmoji is the emoji used for save operations
+	FloppyDiskEmoji = "💾"
+
+	// PartyEmoji is the emoji used for celebration/success
+	PartyEmoji = "🎉"
 )

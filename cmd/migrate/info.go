@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/risoftinc/elsa/constants"
 	"github.com/spf13/cobra"
 )
 
@@ -30,7 +31,7 @@ Examples:
 func runInfo(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		// Show info for both DDL and DML
-		fmt.Println("📋 Migration Information Overview")
+		fmt.Println(constants.InfoOverviewHeader)
 		fmt.Println(strings.Repeat("=", 50))
 
 		if err := showMigrationInfo("ddl"); err != nil {
@@ -46,8 +47,8 @@ func runInfo(cmd *cobra.Command, args []string) error {
 	}
 
 	migrationType := args[0]
-	if migrationType != "ddl" && migrationType != "dml" {
-		return fmt.Errorf("migration type must be 'ddl' or 'dml', got: %s", migrationType)
+	if migrationType != constants.MigrationTypeDDL && migrationType != constants.MigrationTypeDML {
+		return fmt.Errorf(constants.ErrInvalidMigrationType, migrationType)
 	}
 
 	return showMigrationInfo(migrationType)
@@ -59,17 +60,17 @@ func init() {
 }
 
 func showMigrationInfo(migrationType string) error {
-	fmt.Printf("\n🔧 %s Migrations Information:\n", strings.ToUpper(migrationType))
-	fmt.Printf("%s\n", strings.Repeat("-", 40))
+	fmt.Printf(constants.InfoDDLHeader, strings.ToUpper(migrationType))
+	fmt.Printf(constants.InfoDDLSeparator, strings.Repeat("-", 40))
 
 	// Get available migrations
 	migrations, err := GetAvailableMigrationsWithPath(migrationType, infoCustomPath)
 	if err != nil {
-		return fmt.Errorf("failed to get available migrations: %v", err)
+		return fmt.Errorf(constants.ErrFailedShowInfo, err)
 	}
 
 	if len(migrations) == 0 {
-		fmt.Printf("   No %s migrations found\n", strings.ToUpper(migrationType))
+		fmt.Printf(constants.InfoNoMigrationsFound, strings.ToUpper(migrationType))
 		return nil
 	}
 
@@ -80,8 +81,8 @@ func showMigrationInfo(migrationType string) error {
 	// Try to get applied migrations if connection is provided
 	appliedMigrations, err2 = getAppliedMigrationsWithConnection(migrationType, infoConnection)
 	if err2 != nil {
-		fmt.Printf("⚠️  Warning: Could not connect to database: %v\n", err2)
-		fmt.Printf("   Showing file-based information only\n")
+		fmt.Printf(constants.InfoWarningDBConnect, err2)
+		fmt.Printf(constants.InfoShowingFileBasedInfo)
 		appliedMigrations = []string{} // Empty slice to show all as pending
 	}
 
@@ -109,7 +110,7 @@ func showMigrationInfo(migrationType string) error {
 
 		// Show file paths
 		upPath := migration.Path
-		downPath := strings.Replace(upPath, ".up.sql", ".down.sql", 1)
+		downPath := strings.Replace(upPath, ".up.sql", constants.DownMigrationExtension, 1)
 
 		fmt.Printf("   Up File: %s\n", upPath)
 		fmt.Printf("   Down File: %s\n", downPath)

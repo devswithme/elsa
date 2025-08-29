@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/risoftinc/elsa/constants"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
@@ -28,14 +29,14 @@ type DatabaseConfig struct {
 // DefaultConfig returns default database configuration
 func DefaultConfig() *DatabaseConfig {
 	return &DatabaseConfig{
-		Driver:           "sqlite",
-		Host:             "localhost",
-		Port:             "3306",
-		Username:         "root",
-		Password:         "",
-		Database:         "elsa.db",
-		SSLMode:          "disable",
-		Charset:          "utf8mb4",
+		Driver:           constants.DriverSQLite,
+		Host:             constants.DefaultHost,
+		Port:             constants.DefaultPort,
+		Username:         constants.DefaultUsername,
+		Password:         constants.DefaultPassword,
+		Database:         constants.DefaultDatabase,
+		SSLMode:          constants.DefaultSSLMode,
+		Charset:          constants.DefaultCharset,
 		ConnectionString: "",
 	}
 }
@@ -134,35 +135,35 @@ func Connect(config *DatabaseConfig) (*gorm.DB, error) {
 	var dialector gorm.Dialector
 
 	switch strings.ToLower(config.Driver) {
-	case "sqlite":
+	case constants.DriverSQLite:
 		dialector = sqlite.Open(config.Database)
-	case "mysql":
-		dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=%s&parseTime=True&loc=Local",
+	case constants.DriverMySQL:
+		dsn := fmt.Sprintf(constants.MySQLDSNFormat,
 			config.Username, config.Password, config.Host, config.Port, config.Database, config.Charset)
 		dialector = mysql.Open(dsn)
-	case "postgres", "postgresql":
-		dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=Asia/Jakarta",
-			config.Host, config.Username, config.Password, config.Database, config.Port, config.SSLMode)
+	case constants.DriverPostgres, constants.DriverPostgreSQL:
+		dsn := fmt.Sprintf(constants.PostgresDSNFormat,
+			config.Host, config.Username, config.Password, config.Database, config.Port, config.SSLMode, constants.PostgresTimeZone)
 		dialector = postgres.Open(dsn)
 	default:
-		return nil, fmt.Errorf("unsupported database driver: %s", config.Driver)
+		return nil, fmt.Errorf(constants.ErrUnsupportedDriver, config.Driver)
 	}
 
 	db, err := gorm.Open(dialector, &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent), // Disable all GORM logging
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %v", err)
+		return nil, fmt.Errorf(constants.ErrFailedConnect, err)
 	}
 
 	// Test connection
 	sqlDB, err := db.DB()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get underlying sql.DB: %v", err)
+		return nil, fmt.Errorf(constants.ErrFailedGetDB, err)
 	}
 
 	if err := sqlDB.Ping(); err != nil {
-		return nil, fmt.Errorf("failed to ping database: %v", err)
+		return nil, fmt.Errorf(constants.ErrFailedPing, err)
 	}
 
 	return db, nil
@@ -175,13 +176,13 @@ func (c *DatabaseConfig) GetConnectionString() string {
 	}
 
 	switch strings.ToLower(c.Driver) {
-	case "sqlite":
-		return fmt.Sprintf("sqlite://%s", c.Database)
-	case "mysql":
-		return fmt.Sprintf("mysql://%s:%s@%s:%s/%s?charset=%s",
+	case constants.DriverSQLite:
+		return fmt.Sprintf(constants.SQLiteConnectionFormat, c.Database)
+	case constants.DriverMySQL:
+		return fmt.Sprintf(constants.MySQLConnectionFormat,
 			c.Username, c.Password, c.Host, c.Port, c.Database, c.Charset)
-	case "postgres", "postgresql":
-		return fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=%s",
+	case constants.DriverPostgres, constants.DriverPostgreSQL:
+		return fmt.Sprintf(constants.PostgresConnectionFormat,
 			c.Username, c.Password, c.Host, c.Port, c.Database, c.SSLMode)
 	default:
 		return "unknown driver"
@@ -193,17 +194,17 @@ func ParseConnectionString(connectionString string) *DatabaseConfig {
 	config := &DatabaseConfig{}
 
 	// Handle SQLite
-	if strings.HasPrefix(connectionString, "sqlite://") {
-		config.Driver = "sqlite"
-		config.Database = strings.TrimPrefix(connectionString, "sqlite://")
+	if strings.HasPrefix(connectionString, constants.SQLitePrefix) {
+		config.Driver = constants.DriverSQLite
+		config.Database = strings.TrimPrefix(connectionString, constants.SQLitePrefix)
 		return config
 	}
 
 	// Handle MySQL
-	if strings.HasPrefix(connectionString, "mysql://") {
-		config.Driver = "mysql"
+	if strings.HasPrefix(connectionString, constants.MySQLPrefix) {
+		config.Driver = constants.DriverMySQL
 		// mysql://username:password@host:port/database?charset=utf8mb4
-		connectionString = strings.TrimPrefix(connectionString, "mysql://")
+		connectionString = strings.TrimPrefix(connectionString, constants.MySQLPrefix)
 
 		// Split by @ to separate credentials from host
 		parts := strings.Split(connectionString, "@")
@@ -233,7 +234,7 @@ func ParseConnectionString(connectionString string) *DatabaseConfig {
 					config.Port = hostPort[1]
 				} else {
 					config.Host = dbParts[0]
-					config.Port = "3306"
+					config.Port = constants.DefaultPort
 				}
 			}
 		}
@@ -245,18 +246,18 @@ func ParseConnectionString(connectionString string) *DatabaseConfig {
 				config.Charset = strings.Split(queryParts[1], "&")[0]
 			}
 		} else {
-			config.Charset = "utf8mb4"
+			config.Charset = constants.DefaultCharset
 		}
 
 		return config
 	}
 
 	// Handle PostgreSQL
-	if strings.HasPrefix(connectionString, "postgresql://") || strings.HasPrefix(connectionString, "postgres://") {
-		config.Driver = "postgres"
+	if strings.HasPrefix(connectionString, constants.PostgresPrefix) || strings.HasPrefix(connectionString, constants.PostgresAltPrefix) {
+		config.Driver = constants.DriverPostgres
 		// postgresql://username:password@host:port/database?sslmode=disable
-		connectionString = strings.TrimPrefix(connectionString, "postgresql://")
-		connectionString = strings.TrimPrefix(connectionString, "postgres://")
+		connectionString = strings.TrimPrefix(connectionString, constants.PostgresPrefix)
+		connectionString = strings.TrimPrefix(connectionString, constants.PostgresAltPrefix)
 
 		// Split by @ to separate credentials from host
 		parts := strings.Split(connectionString, "@")
@@ -286,7 +287,7 @@ func ParseConnectionString(connectionString string) *DatabaseConfig {
 					config.Port = hostPort[1]
 				} else {
 					config.Host = dbParts[0]
-					config.Port = "5432"
+					config.Port = constants.DefaultPortPostgres
 				}
 			}
 		}
@@ -298,7 +299,7 @@ func ParseConnectionString(connectionString string) *DatabaseConfig {
 				config.SSLMode = strings.Split(queryParts[1], "&")[0]
 			}
 		} else {
-			config.SSLMode = "disable"
+			config.SSLMode = constants.DefaultSSLMode
 		}
 
 		return config

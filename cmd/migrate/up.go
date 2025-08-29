@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/risoftinc/elsa/constants"
 	"github.com/risoftinc/elsa/internal/database"
 	"github.com/spf13/cobra"
 )
@@ -44,32 +45,32 @@ func runUp(cmd *cobra.Command, args []string) error {
 	migrationType := args[0]
 
 	// Validate migration type
-	if migrationType != "ddl" && migrationType != "dml" {
-		return fmt.Errorf("migration type must be 'ddl' or 'dml', got: %s", migrationType)
+	if migrationType != constants.MigrationTypeDDL && migrationType != constants.MigrationTypeDML {
+		return fmt.Errorf(constants.ErrInvalidMigrationType, migrationType)
 	}
 
 	// Get available migrations
 	migrations, err := getAvailableMigrations(migrationType)
 	if err != nil {
-		return fmt.Errorf("failed to get available migrations: %v", err)
+		return fmt.Errorf(constants.ErrFailedGetAppliedMigrations, err)
 	}
 
 	if len(migrations) == 0 {
-		fmt.Printf("ℹ️  No %s migrations found\n", strings.ToUpper(migrationType))
+		fmt.Printf(constants.InfoNoMigrationsFoundStatus, strings.ToUpper(migrationType))
 		return nil
 	}
 
 	// Get applied migrations from database
 	appliedMigrations, err := getAppliedMigrations(migrationType)
 	if err != nil {
-		return fmt.Errorf("failed to get applied migrations: %v", err)
+		return fmt.Errorf(constants.ErrFailedGetAppliedMigrations, err)
 	}
 
 	// Filter pending migrations
 	pendingMigrations := filterPendingMigrations(migrations, appliedMigrations)
 
 	if len(pendingMigrations) == 0 {
-		fmt.Printf("✅ All %s migrations are already applied\n", strings.ToUpper(migrationType))
+		fmt.Printf(constants.SuccessAllApplied, strings.ToUpper(migrationType))
 		return nil
 	}
 
@@ -87,16 +88,16 @@ func runUp(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(migrationsToApply) == 0 {
-		fmt.Printf("ℹ️  No %s migrations to apply\n", strings.ToUpper(migrationType))
+		fmt.Printf(constants.InfoNoMigrationsToApply, strings.ToUpper(migrationType))
 		return nil
 	}
 
 	// Apply migrations
-	fmt.Printf("🚀 Applying %d %s migration(s)...\n", len(migrationsToApply), strings.ToUpper(migrationType))
+	fmt.Printf(constants.InfoApplyingMigrations, len(migrationsToApply), strings.ToUpper(migrationType))
 
 	for _, migration := range migrationsToApply {
 		if err := applyMigration(migration, migrationType); err != nil {
-			return fmt.Errorf("failed to apply migration %s: %v", migration.ID, err)
+			return fmt.Errorf(constants.ErrFailedApplyMigration, migration.ID, err)
 		}
 		fmt.Printf("✅ Applied: %s_%s\n", migration.ID, migration.Name)
 	}

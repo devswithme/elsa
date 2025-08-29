@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/risoftinc/elsa/constants"
 	"github.com/risoftinc/elsa/internal/database"
 	"github.com/spf13/cobra"
 )
@@ -50,25 +51,25 @@ func runDown(cmd *cobra.Command, args []string) error {
 	migrationType := args[0]
 
 	// Validate migration type
-	if migrationType != "ddl" && migrationType != "dml" {
-		return fmt.Errorf("migration type must be 'ddl' or 'dml', got: %s", migrationType)
+	if migrationType != constants.MigrationTypeDDL && migrationType != constants.MigrationTypeDML {
+		return fmt.Errorf(constants.ErrInvalidMigrationType, migrationType)
 	}
 
 	// Get applied migrations from database
 	appliedMigrations, err := getAppliedMigrationsForDown(migrationType)
 	if err != nil {
-		return fmt.Errorf("failed to get applied migrations: %v", err)
+		return fmt.Errorf(constants.ErrFailedGetAppliedMigrations, err)
 	}
 
 	if len(appliedMigrations) == 0 {
-		fmt.Printf("ℹ️  No %s migrations have been applied\n", strings.ToUpper(migrationType))
+		fmt.Printf(constants.InfoNoMigrations, strings.ToUpper(migrationType))
 		return nil
 	}
 
 	// Get available migration files to map IDs to names
 	availableMigrations, err := GetAvailableMigrationsWithPath(migrationType, downCustomPath)
 	if err != nil {
-		return fmt.Errorf("failed to get available migrations: %v", err)
+		return fmt.Errorf(constants.ErrFailedGetAppliedMigrations, err)
 	}
 
 	// Create ID to Migration mapping
@@ -96,7 +97,7 @@ func runDown(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(migrationsToRollback) == 0 {
-		fmt.Printf("ℹ️  No %s migrations to rollback\n", strings.ToUpper(migrationType))
+		fmt.Printf(constants.InfoNoMigrationsToRollback, strings.ToUpper(migrationType))
 		return nil
 	}
 
@@ -186,7 +187,7 @@ func getAppliedMigrationsForDown(migrationType string) ([]string, error) {
 
 func rollbackMigration(migration Migration, migrationType string) error {
 	// Read down migration file
-	downFilePath := strings.Replace(migration.Path, ".up.sql", ".down.sql", 1)
+	downFilePath := strings.Replace(migration.Path, ".up.sql", constants.DownMigrationExtension, 1)
 
 	content, err := os.ReadFile(downFilePath)
 	if err != nil {

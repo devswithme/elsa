@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/risoftinc/elsa/constants"
 	"github.com/spf13/cobra"
 )
 
@@ -34,8 +35,8 @@ Examples:
 )
 
 func init() {
-	createCmd.Flags().BoolVarP(&useTimestamp, "timestamp", "t", true, "Use timestamp format (YYYYMMDDHHMMSSmmm) with milliseconds - default")
-	createCmd.Flags().BoolVarP(&useSequential, "sequential", "s", false, "Use sequential format (00001, 00002, etc.) instead of timestamp")
+	createCmd.Flags().BoolVarP(&useTimestamp, constants.TimestampFormatName, "t", true, "Use timestamp format (YYYYMMDDHHMMSSmmm) with milliseconds - default")
+	createCmd.Flags().BoolVarP(&useSequential, constants.SequentialFormatName, "s", false, "Use sequential format (00001, 00002, etc.) instead of timestamp")
 	createCmd.Flags().StringVarP(&customPath, "path", "p", "", "Custom folder path for migrations (default: database/migration/[ddl|dml])")
 }
 
@@ -44,8 +45,8 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	migrationName := args[1]
 
 	// Validate migration type
-	if migrationType != "ddl" && migrationType != "dml" {
-		return fmt.Errorf("migration type must be 'ddl' or 'dml', got: %s", migrationType)
+	if migrationType != constants.MigrationTypeDDL && migrationType != constants.MigrationTypeDML {
+		return fmt.Errorf(constants.ErrInvalidMigrationType, migrationType)
 	}
 
 	// Determine migration directory
@@ -55,7 +56,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		migrationDir = filepath.Join(customPath, migrationType)
 	} else {
 		// Use default path
-		migrationDir = filepath.Join("database", "migration", migrationType)
+		migrationDir = filepath.Join(constants.DefaultMigrationBaseDir, constants.DefaultMigrationDir, migrationType)
 	}
 
 	// Validate folder format consistency
@@ -69,38 +70,38 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		// Use sequential format: 00001, 00002, etc.
 		nextSeq, err := getNextSequentialNumber(migrationType)
 		if err != nil {
-			return fmt.Errorf("failed to get next sequential number: %v", err)
+			return fmt.Errorf(constants.ErrFailedGetSequential, err)
 		}
-		migrationID = fmt.Sprintf("%05d", nextSeq)
-		fmt.Printf("🔢 Using sequential format: %s\n", migrationID)
+		migrationID = fmt.Sprintf(constants.SequentialFormat, nextSeq)
+		fmt.Printf(constants.InfoUsingSequential, migrationID)
 	} else {
 		// Use timestamp format: YYYYMMDDHHMMSSmmm (default) - includes milliseconds
-		migrationID = time.Now().Format("20060102150405") + fmt.Sprintf("%03d", time.Now().Nanosecond()/1000000)
-		fmt.Printf("📅 Using timestamp format: %s\n", migrationID)
+		migrationID = time.Now().Format(constants.TimestampFormat) + fmt.Sprintf("%03d", time.Now().Nanosecond()/1000000)
+		fmt.Printf(constants.InfoUsingTimestamp, migrationID)
 	}
 
 	// Create migration directory if not exists
-	if err := os.MkdirAll(migrationDir, 0755); err != nil {
-		return fmt.Errorf("failed to create migration directory: %v", err)
+	if err := os.MkdirAll(migrationDir, constants.MigrationDirPerm); err != nil {
+		return fmt.Errorf(constants.ErrFailedCreateDir, err)
 	}
 
 	// Generate file names
-	upFileName := fmt.Sprintf("%s_%s.up.sql", migrationID, migrationName)
-	downFileName := fmt.Sprintf("%s_%s.down.sql", migrationID, migrationName)
+	upFileName := fmt.Sprintf(constants.MigrationNameFormat+constants.UpMigrationExtension, migrationID, migrationName)
+	downFileName := fmt.Sprintf(constants.MigrationNameFormat+constants.DownMigrationExtension, migrationID, migrationName)
 
 	upFilePath := filepath.Join(migrationDir, upFileName)
 	downFilePath := filepath.Join(migrationDir, downFileName)
 
 	// Create up migration file
 	upContent := generateUpMigrationContent(migrationType, migrationName)
-	if err := os.WriteFile(upFilePath, []byte(upContent), 0644); err != nil {
-		return fmt.Errorf("failed to create up migration file: %v", err)
+	if err := os.WriteFile(upFilePath, []byte(upContent), constants.MigrationFilePerm); err != nil {
+		return fmt.Errorf(constants.ErrFailedCreateFile, err)
 	}
 
 	// Create down migration file
 	downContent := generateDownMigrationContent(migrationType, migrationName)
-	if err := os.WriteFile(downFilePath, []byte(downContent), 0644); err != nil {
-		return fmt.Errorf("failed to create down migration file: %v", err)
+	if err := os.WriteFile(downFilePath, []byte(downContent), constants.MigrationFilePerm); err != nil {
+		return fmt.Errorf(constants.ErrFailedCreateFile, err)
 	}
 
 	fmt.Printf("✅ Created migration files:\n")
@@ -152,33 +153,10 @@ func getNextSequentialNumber(migrationType string) (int, error) {
 
 func generateUpMigrationContent(migrationType, migrationName string) string {
 	switch migrationType {
-	case "ddl":
-		return fmt.Sprintf(`-- Migration: %s
--- Type: DDL
--- Description: %s
-
--- Add your DDL statements here
--- Example:
--- CREATE TABLE users (
---     id SERIAL PRIMARY KEY,
---     name VARCHAR(255) NOT NULL,
---     email VARCHAR(255) UNIQUE NOT NULL,
---     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
--- );
-
-`, migrationName, migrationName)
-	case "dml":
-		return fmt.Sprintf(`-- Migration: %s
--- Type: DML
--- Description: %s
-
--- Add your DML statements here
--- Example:
--- INSERT INTO users (name, email) VALUES 
---     ('John Doe', 'john@example.com'),
---     ('Jane Smith', 'jane@example.com');
-
-`, migrationName, migrationName)
+	case constants.MigrationTypeDDL:
+		return fmt.Sprintf(constants.DDLUpTemplate, migrationName, migrationName)
+	case constants.MigrationTypeDML:
+		return fmt.Sprintf(constants.DMLUpTemplate, migrationName, migrationName)
 	default:
 		return ""
 	}
@@ -186,26 +164,10 @@ func generateUpMigrationContent(migrationType, migrationName string) string {
 
 func generateDownMigrationContent(migrationType, migrationName string) string {
 	switch migrationType {
-	case "ddl":
-		return fmt.Sprintf(`-- Rollback Migration: %s
--- Type: DDL
--- Description: %s
-
--- Add your rollback DDL statements here
--- Example:
--- DROP TABLE IF EXISTS users;
-
-`, migrationName, migrationName)
-	case "dml":
-		return fmt.Sprintf(`-- Rollback Migration: %s
--- Type: DML
--- Description: %s
-
--- Add your rollback DML statements here
--- Example:
--- DELETE FROM users WHERE email IN ('john@example.com', 'jane@example.com');
-
-`, migrationName, migrationName)
+	case constants.MigrationTypeDDL:
+		return fmt.Sprintf(constants.DDLDownTemplate, migrationName, migrationName)
+	case constants.MigrationTypeDML:
+		return fmt.Sprintf(constants.DMLDownTemplate, migrationName, migrationName)
 	default:
 		return ""
 	}
@@ -251,9 +213,9 @@ func validateFolderFormatConsistency(migrationDir string, useSequential bool) er
 	}
 
 	// Check if new migration format matches existing format
-	newFormat := "sequential"
+	newFormat := constants.SequentialFormatName
 	if !useSequential {
-		newFormat = "timestamp"
+		newFormat = constants.TimestampFormatName
 	}
 
 	if existingFormat != newFormat {
@@ -266,7 +228,7 @@ func validateFolderFormatConsistency(migrationDir string, useSequential bool) er
 // determineMigrationFormat determines if a migration file uses sequential or timestamp format
 func determineMigrationFormat(fileName string) string {
 	// Remove .up.sql or .down.sql suffix
-	baseName := strings.TrimSuffix(strings.TrimSuffix(fileName, ".up.sql"), ".down.sql")
+	baseName := strings.TrimSuffix(strings.TrimSuffix(fileName, ".up.sql"), constants.DownMigrationExtension)
 
 	// Extract the ID part (before first underscore)
 	parts := strings.Split(baseName, "_")
@@ -280,12 +242,12 @@ func determineMigrationFormat(fileName string) string {
 	if len(id) == 5 {
 		// Check if it's numeric
 		if _, err := fmt.Sscanf(id, "%d", new(int)); err == nil {
-			return "sequential"
+			return constants.SequentialFormatName
 		}
 	} else if len(id) == 17 {
 		// Check if it's timestamp format (YYYYMMDDHHMMSSmmm)
-		if _, err := time.Parse("20060102150405", id[:14]); err == nil {
-			return "timestamp"
+		if _, err := time.Parse(constants.TimestampFormat, id[:14]); err == nil {
+			return constants.TimestampFormatName
 		}
 	}
 
@@ -298,7 +260,7 @@ func GetMigrationPath(migrationType string, customPath string) string {
 	if customPath != "" {
 		return filepath.Join(customPath, migrationType)
 	}
-	return filepath.Join("database", "migration", migrationType)
+	return filepath.Join(constants.DefaultMigrationBaseDir, constants.DefaultMigrationDir, migrationType)
 }
 
 // GetAvailableMigrationsWithPath returns available migrations from a specific path
@@ -317,12 +279,12 @@ func GetAvailableMigrationsWithPath(migrationType string, customPath string) ([]
 
 	var migrations []Migration
 	for _, file := range files {
-		if file.IsDir() || !strings.HasSuffix(file.Name(), ".up.sql") {
+		if file.IsDir() || !strings.HasSuffix(file.Name(), constants.UpMigrationExtension) {
 			continue
 		}
 
 		// Parse filename: 00001_create_table.up.sql
-		parts := strings.Split(strings.TrimSuffix(file.Name(), ".up.sql"), "_")
+		parts := strings.Split(strings.TrimSuffix(file.Name(), constants.UpMigrationExtension), "_")
 		if len(parts) < 2 {
 			continue
 		}
