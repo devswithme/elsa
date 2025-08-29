@@ -1,66 +1,77 @@
 package elsafile
 
 import (
-	"reflect"
+	"fmt"
+
+	"github.com/risoftinc/elsa/constants"
 )
 
-// HasConflict checks if a command name conflicts with built-in commands
-func (em *Manager) HasConflict(name string) bool {
-	// If we have root command, get built-in commands dynamically
-	if em.rootCommand != nil {
-		// Use reflection to call Commands() method on cobra.Command
-		rootCmdValue := reflect.ValueOf(em.rootCommand)
-		if rootCmdValue.Kind() == reflect.Ptr {
-			rootCmdValue = rootCmdValue.Elem()
-		}
+// ConflictHandler handles command conflicts between built-in and Elsafile commands
+type ConflictHandler struct {
+	elsafileManager *Manager
+}
 
-		// Try to call Commands() method
-		commandsMethod := rootCmdValue.MethodByName("Commands")
-		if commandsMethod.IsValid() {
-			commandsResult := commandsMethod.Call(nil)
-			if len(commandsResult) > 0 {
-				commands := commandsResult[0]
-				if commands.Kind() == reflect.Slice {
-					for i := 0; i < commands.Len(); i++ {
-						cmd := commands.Index(i)
-						if cmd.Kind() == reflect.Ptr {
-							cmd = cmd.Elem()
-						}
+// NewConflictHandler creates a new ConflictHandler instance
+func NewConflictHandler() *ConflictHandler {
+	return &ConflictHandler{
+		elsafileManager: NewManager(constants.DefaultElsafileName),
+	}
+}
 
-						// Try to get Name() and Hidden() methods
-						nameMethod := cmd.MethodByName("Name")
-						hiddenMethod := cmd.MethodByName("Hidden")
+// NewConflictHandlerWithManager creates a new ConflictHandler instance with a specific manager
+func NewConflictHandlerWithManager(manager *Manager) *ConflictHandler {
+	return &ConflictHandler{
+		elsafileManager: manager,
+	}
+}
 
-						if nameMethod.IsValid() && hiddenMethod.IsValid() {
-							nameResult := nameMethod.Call(nil)
-							hiddenResult := hiddenMethod.Call(nil)
+// ExecuteElsafileCommand executes a command from Elsafile (used by run command)
+func (h *ConflictHandler) ExecuteElsafileCommand(commandName string) error {
+	if err := h.elsafileManager.Load(); err != nil {
+		return err
+	}
 
-							if len(nameResult) > 0 && len(hiddenResult) > 0 {
-								cmdName := nameResult[0].String()
-								isHidden := hiddenResult[0].Bool()
+	return h.elsafileManager.ExecuteCommand(commandName)
+}
 
-								if cmdName == name && !isHidden {
-									return true
-								}
-							}
-						}
-					}
-				}
-			}
-		}
+// ListCommands lists all available commands from Elsafile
+func (h *ConflictHandler) ListCommands() (map[string]*Command, error) {
+	if err := h.elsafileManager.Load(); err != nil {
+		return nil, err
+	}
+
+	return h.elsafileManager.ListCommands(), nil
+}
+
+// GetConflictingCommands returns commands that conflict with built-ins
+func (h *ConflictHandler) GetConflictingCommands() ([]string, error) {
+	if err := h.elsafileManager.Load(); err != nil {
+		return nil, err
+	}
+
+	return h.elsafileManager.GetConflictingCommands(), nil
+}
+
+// HasConflict checks if a specific command conflicts with built-ins
+func (h *ConflictHandler) HasConflict(commandName string) bool {
+	if err := h.elsafileManager.Load(); err != nil {
 		return false
 	}
 
-	// Fallback to static list if no root command available
-	builtinCommands := []string{
-		"init", "run", "list", "exec", "migrate", "watch", "help", "version",
-	}
+	return h.elsafileManager.HasConflict(commandName)
+}
 
-	for _, builtin := range builtinCommands {
-		if name == builtin {
-			return true
-		}
-	}
+// GetConflictMessage returns a formatted message about command conflicts
+func (h *ConflictHandler) GetConflictMessage(commandName string) string {
+	return fmt.Sprintf(`⚠️  Command '%s' conflicts with a built-in Elsa command
+💡 Use 'elsa run %s' to execute the Elsafile command
+   Or use 'elsa %s' to run the built-in command`, commandName, commandName, commandName)
+}
 
-	return false
+// GetConflictResolutionMessage returns a message explaining how to resolve conflicts
+func (h *ConflictHandler) GetConflictResolutionMessage() string {
+	return `💡 To resolve command conflicts:
+   - Use 'elsa run command_name' to execute Elsafile commands
+   - Use 'elsa command_name' to run built-in commands
+   - Rename conflicting commands in your Elsafile to avoid conflicts`
 }

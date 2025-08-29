@@ -3,8 +3,8 @@ package elsafile
 import (
 	"fmt"
 	"os"
-	"strings"
 
+	"github.com/risoftinc/elsa/internal/elsafile"
 	"github.com/spf13/cobra"
 )
 
@@ -31,67 +31,11 @@ func init() {
 }
 
 func listElsafileCommands(showConflictsOnly bool) error {
-	// Create and use ConflictHandler
-	handler := NewConflictHandler()
-
-	commands, err := handler.ListCommands()
-	if err != nil {
-		return err
-	}
-
-	if len(commands) == 0 {
-		fmt.Println("📝 No commands found in Elsafile")
-		fmt.Println("💡 Run 'elsa init' to create an Elsafile with default commands")
-		return nil
-	}
+	commandLister := elsafile.NewCommandLister()
 
 	if showConflictsOnly {
-		conflicts, err := handler.GetConflictingCommands()
-		if err != nil {
-			return err
-		}
-
-		if len(conflicts) == 0 {
-			fmt.Println("✅ No command conflicts found")
-			return nil
-		}
-
-		fmt.Println("⚠️  Commands that conflict with built-in Elsa commands:")
-		fmt.Println("   (Use 'elsa run command_name' to execute these)")
-		fmt.Println()
-		for _, name := range conflicts {
-			cmd := commands[name]
-			fmt.Printf("  %s\n", name)
-			if len(cmd.Commands) > 0 {
-				fmt.Printf("    %s\n", strings.Join(cmd.Commands, " && "))
-			}
-			fmt.Println()
-		}
-		return nil
+		return commandLister.ListConflictingCommands()
 	}
 
-	fmt.Println("📋 Available commands in Elsafile:")
-	fmt.Println()
-
-	// Show all commands
-	for name, cmd := range commands {
-		conflict := ""
-		if handler.HasConflict(name) {
-			conflict = " ⚠️  (conflicts with built-in, use 'run:' prefix)"
-		}
-
-		fmt.Printf("  %s%s\n", name, conflict)
-		if len(cmd.Commands) > 0 {
-			fmt.Printf("    %s\n", strings.Join(cmd.Commands, " && "))
-		}
-		fmt.Println()
-	}
-
-	// Show usage instructions
-	fmt.Println("💡 Usage:")
-	fmt.Println("  elsa run command_name    # Execute a command from Elsafile")
-	fmt.Println("  elsa list --conflicts    # Show conflicting commands")
-	fmt.Println("  elsa init                # Create a new Elsafile")
-
-	return nil
+	return commandLister.ListAllCommands()
 }
