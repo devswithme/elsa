@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/risoftinc/elsa/constants"
+	"github.com/risoftinc/elsa/internal/elsafile"
 	"github.com/spf13/cobra"
 )
 
@@ -35,9 +37,9 @@ Note: If a command name conflicts with built-in Elsa commands,
 
 		// Check if the first argument starts with "run:"
 		commandName := args[0]
-		if len(commandName) > 4 && commandName[:4] == "run:" {
+		if len(commandName) > constants.ConflictResolutionPrefixLength && commandName[:constants.ConflictResolutionPrefixLength] == constants.ConflictResolutionPrefix {
 			// Extract the actual command name after "run:"
-			actualCommand := commandName[4:]
+			actualCommand := commandName[constants.ConflictResolutionPrefixLength:]
 			if err := runElsafileCommand(actualCommand); err != nil {
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				os.Exit(1)
@@ -53,7 +55,7 @@ Note: If a command name conflicts with built-in Elsa commands,
 }
 
 func runElsafileCommand(commandName string) error {
-	// Create and use ConflictHandler
-	handler := NewConflictHandler()
+	// Create and use ConflictHandler from internal package
+	handler := elsafile.NewConflictHandler()
 	return handler.ExecuteElsafileCommand(commandName)
 }

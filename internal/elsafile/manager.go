@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/risoftinc/elsa/constants"
 	"github.com/spf13/cobra"
 )
 
@@ -44,12 +45,12 @@ func NewManagerWithRoot(filepath string, rootCmd *cobra.Command) *Manager {
 // Load loads and parses the Elsafile
 func (em *Manager) Load() error {
 	if _, err := os.Stat(em.filepath); os.IsNotExist(err) {
-		return fmt.Errorf("Elsafile not found at %s. Run 'elsa init' to create one", em.filepath)
+		return fmt.Errorf(constants.ErrElsafileNotFound, em.filepath)
 	}
 
 	file, err := os.Open(em.filepath)
 	if err != nil {
-		return fmt.Errorf("failed to open Elsafile: %v", err)
+		return fmt.Errorf(constants.ErrFailedToOpenFile, err)
 	}
 	defer file.Close()
 
@@ -65,19 +66,19 @@ func (em *Manager) parseFile(file *os.File) error {
 		line := strings.TrimSpace(scanner.Text())
 
 		// Skip empty lines and comments
-		if line == "" || strings.HasPrefix(line, "#") {
+		if line == "" || strings.HasPrefix(line, constants.CommentPrefix) {
 			continue
 		}
 
 		// Check if this is a command definition (ends with :)
-		if strings.HasSuffix(line, ":") {
+		if strings.HasSuffix(line, constants.CommandSuffix) {
 			// Save previous command if exists
 			if currentCommand != nil && len(currentCommand.Commands) > 0 {
 				em.commands[currentCommand.Name] = currentCommand
 			}
 
 			// Start new command
-			commandName := strings.TrimSuffix(line, ":")
+			commandName := strings.TrimSuffix(line, constants.CommandSuffix)
 			currentCommand = &Command{
 				Name:     commandName,
 				Commands: []string{},
@@ -94,7 +95,7 @@ func (em *Manager) parseFile(file *os.File) error {
 	}
 
 	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("error reading Elsafile: %v", err)
+		return fmt.Errorf(constants.ErrFailedToReadFile, err)
 	}
 
 	return nil
@@ -115,14 +116,14 @@ func (em *Manager) ListCommands() map[string]*Command {
 func (em *Manager) ExecuteCommand(name string) error {
 	command, exists := em.GetCommand(name)
 	if !exists {
-		return fmt.Errorf("command '%s' not found in Elsafile", name)
+		return fmt.Errorf(constants.ErrCommandNotFound, name)
 	}
 
-	fmt.Printf("🚀 Running Elsafile command: %s\n", name)
-	fmt.Printf("📝 Executing: %s\n\n", strings.Join(command.Commands, " && "))
+	fmt.Printf("%s Running Elsafile command: %s\n", constants.RocketEmoji, name)
+	fmt.Printf("%s Executing: %s\n\n", constants.PencilEmoji, strings.Join(command.Commands, constants.CommandSeparator))
 
 	// Join all commands with && to execute them sequentially
-	fullCommand := strings.Join(command.Commands, " && ")
+	fullCommand := strings.Join(command.Commands, constants.CommandSeparator)
 	return em.ExecuteShellCommand(fullCommand)
 }
 
@@ -134,12 +135,12 @@ func (em *Manager) ExecuteShellCommand(command string) error {
 	// Detect OS and use appropriate shell
 	if os.PathSeparator == '\\' {
 		// Windows
-		shell = "cmd"
-		args = []string{"/C", command}
+		shell = constants.WindowsShell
+		args = []string{constants.WindowsShellArgs, command}
 	} else {
 		// Unix-like systems
-		shell = "/bin/sh"
-		args = []string{"-c", command}
+		shell = constants.UnixShell
+		args = []string{constants.UnixShellArgs, command}
 	}
 
 	cmd := exec.Command(shell, args...)
@@ -163,9 +164,7 @@ func (em *Manager) HasConflict(name string) bool {
 	}
 
 	// Fallback to static list if no root command available
-	builtinCommands := []string{
-		"init", "run", "list", "exec", "migrate", "watch", "help", "version",
-	}
+	builtinCommands := strings.Split(constants.BuiltinCommands, ",")
 
 	for _, builtin := range builtinCommands {
 		if name == builtin {

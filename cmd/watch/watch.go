@@ -9,47 +9,40 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/risoftinc/elsa/constants"
 	internalWatch "github.com/risoftinc/elsa/internal/watch"
 	"github.com/spf13/cobra"
 )
 
 var (
 	WatchCmd = &cobra.Command{
-		Use:   "watch [command]",
-		Short: "Watch Go files and auto-restart on changes",
-		Long: `Watch Go files in the current directory and automatically restart the specified command when changes are detected.
-		
-Only Go files (*.go) are monitored to avoid unnecessary restarts from temporary files or uploads.
-Automatically excludes common Go development folders like vendor, build, bin, pkg, etc.
-
-Examples:
-  elsa watch "go run main.go"
-  elsa watch "go build && ./elsa"
-  elsa watch "go test ./..."`,
-		Args: cobra.MinimumNArgs(1),
-		Run:  runWatch,
+		Use:   constants.WatchCommandUsage,
+		Short: constants.WatchCommandShort,
+		Long:  constants.WatchCommandLong,
+		Args:  cobra.MinimumNArgs(1),
+		Run:   runWatch,
 	}
 
 	// Watch options
-	watchExtensions  = []string{".go"}
-	watchExcludeDirs = []string{".git", "vendor", "tmp", "temp", "build", "dist", "bin", "pkg", ".vscode", ".idea", "coverage", "testdata"}
-	watchDelay       = 500 * time.Millisecond
+	watchExtensions  = []string{constants.DefaultWatchExtensions}
+	watchExcludeDirs = strings.Split(constants.DefaultWatchExcludeDirs, ",")
+	watchDelay       = constants.DefaultWatchDelay
 )
 
 func init() {
-	WatchCmd.Flags().StringSliceVarP(&watchExtensions, "ext", "e", watchExtensions, "File extensions to watch")
-	WatchCmd.Flags().StringSliceVarP(&watchExcludeDirs, "exclude", "x", watchExcludeDirs, "Directories to exclude from watching")
-	WatchCmd.Flags().DurationVarP(&watchDelay, "delay", "d", watchDelay, "Delay before restarting (e.g., 500ms, 1s)")
+	WatchCmd.Flags().StringSliceVarP(&watchExtensions, constants.WatchFlagExt, constants.WatchFlagExtShort, watchExtensions, constants.WatchFlagExtUsage)
+	WatchCmd.Flags().StringSliceVarP(&watchExcludeDirs, constants.WatchFlagExclude, constants.WatchFlagExcludeShort, watchExcludeDirs, constants.WatchFlagExcludeUsage)
+	WatchCmd.Flags().DurationVarP(&watchDelay, constants.WatchFlagDelay, constants.WatchFlagDelayShort, watchDelay, constants.WatchFlagDelayUsage)
 }
 
 func runWatch(cmd *cobra.Command, args []string) {
 	command := strings.Join(args, " ")
-	fmt.Printf("🚀 Starting watch mode for: %s\n", command)
-	fmt.Printf("📁 Watching Go files in: %s\n", internalWatch.GetCurrentDir())
-	fmt.Printf("⏱️ Restart delay: %v\n", watchDelay)
-	fmt.Printf("🔍 File extensions: %v\n", watchExtensions)
-	fmt.Printf("🚫 Excluded dirs: %v\n", watchExcludeDirs)
-	fmt.Printf("Press Ctrl+C to stop watching\n\n")
+	fmt.Printf(constants.MsgWatchStarting+"\n", command)
+	fmt.Printf(constants.MsgWatchDirectory+"\n", internalWatch.GetCurrentDir())
+	fmt.Printf(constants.MsgWatchDelay+"\n", watchDelay)
+	fmt.Printf(constants.MsgWatchExtensions+"\n", watchExtensions)
+	fmt.Printf(constants.MsgWatchExcludedDirs+"\n", watchExcludeDirs)
+	fmt.Printf(constants.MsgWatchPressCtrlC + "\n\n")
 
 	// Create watch options
 	watchOptions := &internalWatch.WatchOptions{
@@ -90,21 +83,21 @@ func runWatch(cmd *cobra.Command, args []string) {
 			select {
 			case event := <-events:
 				if !isRestarting {
-					fmt.Printf("📝 File changed: %s\n", event.Name)
+					fmt.Printf(constants.MsgWatchFileChanged+"\n", event.Name)
 					isRestarting = true
 					debounce = time.After(watchDelay)
 				}
 
 			case <-debounce:
-				fmt.Printf("🔄 Restarting command...\n")
+				fmt.Printf(constants.MsgWatchRestarting + "\n")
 				if err := processManager.RestartCommand(command, watchDelay); err != nil {
-					fmt.Printf("❌ Error restarting command: %v\n", err)
+					fmt.Printf(constants.MsgWatchRestartError+"\n", err)
 				}
 				debounce = nil
 				isRestarting = false
 
 			case err := <-errors:
-				fmt.Printf("❌ Watcher error: %v\n", err)
+				fmt.Printf(constants.MsgWatchError+"\n", err)
 			}
 		}
 	}()
@@ -114,6 +107,6 @@ func runWatch(cmd *cobra.Command, args []string) {
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	<-sigChan
 
-	fmt.Println("\n👋 Stopping watch mode...")
+	fmt.Println("\n" + constants.MsgWatchStopping)
 	processManager.StopCommand()
 }

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/risoftinc/elsa/constants"
 )
 
 // ProcessManager handles starting, stopping, and monitoring processes
@@ -22,14 +24,14 @@ func NewProcessManager() *ProcessManager {
 
 // StartCommand starts a new command and stores the process reference
 func (pm *ProcessManager) StartCommand(command string) error {
-	fmt.Printf("▶️  Running: %s\n", command)
+	fmt.Printf(constants.MsgWatchRunning+"\n", command)
 
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
-		cmd = exec.Command("cmd", "/C", command)
+		cmd = exec.Command(constants.WindowsShell, constants.WindowsShellArgs, command)
 	} else {
 		// Use universal shell for Unix systems (Linux, macOS, BSD)
-		cmd = exec.Command("sh", "-c", command)
+		cmd = exec.Command(constants.UnixShell, constants.UnixShellArgs, command)
 	}
 
 	cmd.Stdout = os.Stdout
@@ -47,10 +49,10 @@ func (pm *ProcessManager) StartCommand(command string) error {
 		if err := cmd.Wait(); err != nil {
 			// Don't show error for terminated commands
 			if err.Error() != "signal: interrupt" && err.Error() != "exit status 1" {
-				fmt.Printf("❌ Command exited with error: %v\n", err)
+				fmt.Printf(constants.MsgWatchExitedWithError+"\n", err)
 			}
 		} else {
-			fmt.Println("✅ Command completed")
+			fmt.Println(constants.MsgWatchCompleted)
 		}
 	}()
 
@@ -64,7 +66,7 @@ func (pm *ProcessManager) StopCommand() {
 	}
 
 	pid := pm.currentProcess.Process.Pid
-	fmt.Printf("🛑 Killing process PID: %d\n", pid)
+	fmt.Printf(constants.MsgWatchKillingProcess+"\n", pid)
 
 	if runtime.GOOS == "windows" {
 		// Use taskkill on Windows
@@ -73,27 +75,27 @@ func (pm *ProcessManager) StopCommand() {
 		// For Unix systems (Linux, macOS, BSD)
 		// 1. Try graceful kill first
 		_ = pm.currentProcess.Process.Signal(syscall.SIGTERM)
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(constants.ProcessKillDelay)
 
 		// 2. Force kill if still alive
 		if IsProcessRunning(pid) {
-			fmt.Printf("⚠️ Process still running, force killing...\n")
+			fmt.Printf(constants.MsgWatchForceKilling + "\n")
 			_ = pm.currentProcess.Process.Kill()
 		}
 	}
 
 	// Wait a bit to ensure process is really dead
-	time.Sleep(1 * time.Second)
+	time.Sleep(constants.ProcessWaitDelay)
 	pm.currentProcess = nil
 }
 
 // RestartCommand stops the current command and starts a new one
 func (pm *ProcessManager) RestartCommand(command string, delay time.Duration) error {
-	fmt.Println("🔄 Restarting...")
+	fmt.Println(constants.MsgWatchRestartingProcess)
 	pm.StopCommand()
 
 	// Wait a bit to ensure port release
-	time.Sleep(2*time.Second + delay)
+	time.Sleep(constants.RestartWaitDelay + delay)
 
 	return pm.StartCommand(command)
 }
