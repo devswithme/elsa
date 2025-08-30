@@ -45,52 +45,10 @@ func (g *Generator) processGenerateDependencies(target string) error {
 	// Ekstrak fungsi yang mengandung elsa.Generate
 	funcs, err := g.ExtractElsaGenerateFuncs(target)
 	if err != nil {
-		fmt.Printf("Warning: failed to extract generate functions: %v\n", err)
-	} else {
-		fmt.Println("=== FUNGSI YANG MENGANDUNG ELSA.GENERATE ===")
-		for _, funcInfo := range funcs {
-			fmt.Printf("Fungsi: %s\n", funcInfo.FuncName)
-			fmt.Printf("Package: %s\n", funcInfo.PkgName)
-
-			if len(funcInfo.Params) > 0 {
-				fmt.Printf("Parameter:\n")
-				for i, param := range funcInfo.Params {
-					fmt.Printf("  [%d] %s: %s\n", i, param.Name, param.Type)
-				}
-			}
-
-			if len(funcInfo.Results) > 0 {
-				fmt.Printf("Return:\n")
-				for _, result := range funcInfo.Results {
-					fmt.Printf("  - %s", result.Type)
-					if result.IsStruct {
-						fmt.Printf(" (struct)")
-						if len(result.StructFields) > 0 {
-							fmt.Printf(":\n")
-							for _, field := range result.StructFields {
-								fmt.Printf("    * %s: %s", field.Name, field.Type)
-								if field.Tag != "" {
-									fmt.Printf(" `%s`", field.Tag)
-								}
-								fmt.Println()
-							}
-						} else {
-							fmt.Printf(" (field details not available)")
-						}
-					}
-					fmt.Println()
-				}
-			}
-
-			if len(funcInfo.GenerateParams) > 0 {
-				fmt.Printf("Elsa.Generate Parameters:\n")
-				for i, param := range funcInfo.GenerateParams {
-					fmt.Printf("  [%d] %s\n", i, param)
-				}
-			}
-			fmt.Println()
-		}
+		return err
 	}
+
+	fmt.Println(funcs)
 
 	sets, err := g.ParseElsaSets(target)
 	if err != nil {
