@@ -1,4 +1,4 @@
-package main
+package elsa
 
 // Set configures dependency data that will be used for building.
 // It accepts variadic arguments following the pattern: pkg.funcname
