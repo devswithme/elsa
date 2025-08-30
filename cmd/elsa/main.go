@@ -4,18 +4,18 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/risoftinc/elsa/cmd/root"
+	"github.com/risoftinc/elsa/cmd"
 )
 
 var (
-	version = "0.5.6"
+	version = "0.5.7"
 )
 
 func main() {
 	// Set version info
-	root.SetVersionInfo(version)
+	cmd.SetVersionInfo(version)
 
-	if err := root.Execute(); err != nil {
+	if err := cmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
