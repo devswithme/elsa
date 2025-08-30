@@ -3,54 +3,44 @@ package generate
 import (
 	"fmt"
 	"go/ast"
-	"go/parser"
 	"go/token"
-	"strings"
 )
 
+// FuncInfo represents information about a function found in elsa.Set calls
+// Contains function name, package information, parameters, results, and generation parameters
 type FuncInfo struct {
-	FuncName       string
-	PkgName        string
-	PkgPath        string
-	Params         []ParamInfo
-	Results        []ResultInfo
-	GenerateParams []string
+	FuncName       string       // Name of the function
+	PkgName        string       // Package alias or name
+	PkgPath        string       // Full package path
+	Params         []ParamInfo  // Function parameters
+	Results        []ResultInfo // Function return values
+	GenerateParams []string     // Parameters passed to elsa.Generate
 }
 
+// ParamInfo represents information about a function parameter
+// Contains the parameter name and type
 type ParamInfo struct {
-	Name string
-	Type string
+	Name string // Parameter name
+	Type string // Parameter type
 }
 
-// parseElsaSets menerima path file dan return map[string][]string
-// key = nama variabel (RepositorySet, ServicesSet, dll)
-// value = list fungsi di dalam elsa.Set(...)
+// ParseElsaSets parses a file and returns a map of variable names to function information
+// Key = variable name (RepositorySet, ServicesSet, etc.)
+// Value = list of functions inside elsa.Set(...) calls
+// This function analyzes Go AST to find elsa.Set declarations and extract function information
 func (g *Generator) ParseElsaSets(path string) (map[string][]FuncInfo, error) {
-	fset := token.NewFileSet()
-
-	// parse file jadi AST
-	node, err := parser.ParseFile(fset, path, nil, parser.AllErrors)
+	// Parse file into AST
+	node, err := parseFile(path)
 	if err != nil {
 		return nil, err
 	}
 
-	// --- Kumpulin imports ---
-	g.imports = make(map[string]string)
-	for _, imp := range node.Imports {
-		pkgPath := strings.Trim(imp.Path.Value, `"`)
-		if imp.Name != nil {
-			// alias import, contoh: healthRepo "github.com/xxx/health"
-			g.imports[imp.Name.Name] = pkgPath
-		} else {
-			// tanpa alias → ambil last segment
-			parts := strings.Split(pkgPath, "/")
-			g.imports[parts[len(parts)-1]] = pkgPath
-		}
-	}
+	// --- Collect imports ---
+	g.imports = parseImports(node)
 
 	results := make(map[string][]FuncInfo)
 
-	// loop semua deklarasi di file
+	// Loop through all declarations in the file
 	for _, decl := range node.Decls {
 		gen, ok := decl.(*ast.GenDecl)
 		if !ok || gen.Tok != token.VAR {
@@ -72,7 +62,7 @@ func (g *Generator) ParseElsaSets(path string) (map[string][]FuncInfo, error) {
 					continue
 				}
 
-				// pastikan itu elsa.Set(...)
+				// Ensure it's elsa.Set(...)
 				funIdent, ok := call.Fun.(*ast.SelectorExpr)
 				if !ok {
 					continue
@@ -81,12 +71,12 @@ func (g *Generator) ParseElsaSets(path string) (map[string][]FuncInfo, error) {
 					continue
 				}
 
-				// ambil semua argumen di dalam elsa.Set
+				// Extract all arguments inside elsa.Set
 				var funcs []FuncInfo
 				for _, arg := range call.Args {
 					switch v := arg.(type) {
 					case *ast.SelectorExpr:
-						// contoh: healthRepo.NewHealthRepositories
+						// Example: healthRepo.NewHealthRepositories
 						pkgIdent, ok := v.X.(*ast.Ident)
 						if !ok {
 							continue

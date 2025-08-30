@@ -4,46 +4,26 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 // FindElsabuildFiles searches for files with elsabuild build tags in the specified directory
+// Recursively walks through the directory tree to find Go files containing the elsabuild tag
+// Returns a slice of relative paths to files with the specified build tag
 func (g *Generator) FindElsabuildFiles(targetDir string) ([]string, error) {
-	var searchDir string
-	var err error
-
-	if targetDir != "" {
-		// If target directory is provided, resolve it relative to current directory
-		if filepath.IsAbs(targetDir) {
-			searchDir = targetDir
-		} else {
-			currentDir, err := os.Getwd()
-			if err != nil {
-				return []string{}, fmt.Errorf("failed to get current directory: %v", err)
-			}
-			searchDir = filepath.Join(currentDir, targetDir)
-		}
-
-		// Check if target directory exists
-		if _, err := os.Stat(searchDir); os.IsNotExist(err) {
-			return []string{}, fmt.Errorf("target directory does not exist: %s", targetDir)
-		}
-	} else {
-		// Use current directory if no target specified
-		searchDir, err = os.Getwd()
-		if err != nil {
-			return []string{}, fmt.Errorf("failed to get current directory: %v", err)
-		}
+	searchDir, err := resolvePath(targetDir)
+	if err != nil {
+		return nil, err
 	}
 
 	foundFiles := []string{}
-	err = filepath.Walk(searchDir, func(path string, info os.FileInfo, err error) error {
+
+	err = safeWalk(searchDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
 		// Skip directories and non-Go files
-		if info.IsDir() || !strings.HasSuffix(strings.ToLower(path), ".go") {
+		if info.IsDir() || !isGoFile(path) {
 			return nil
 		}
 
@@ -54,9 +34,7 @@ func (g *Generator) FindElsabuildFiles(targetDir string) ([]string, error) {
 		}
 
 		// Check for elsabuild build tag
-		fileContent := string(content)
-		if strings.Contains(fileContent, "//go:build elsabuild") ||
-			strings.Contains(fileContent, "// +build elsabuild") {
+		if hasBuildTag(string(content), "elsabuild") {
 			// Get relative path from search directory
 			relPath, err := filepath.Rel(searchDir, path)
 			if err != nil {
@@ -69,11 +47,7 @@ func (g *Generator) FindElsabuildFiles(targetDir string) ([]string, error) {
 	})
 
 	if err != nil {
-		return []string{}, fmt.Errorf("error walking directory: %v", err)
-	}
-
-	if len(foundFiles) == 0 {
-		return []string{}, nil
+		return nil, fmt.Errorf("error walking directory: %v", err)
 	}
 
 	return foundFiles, nil

@@ -8,13 +8,17 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-// Constructor info
+// Constructor represents information about a constructor function
+// Contains the function name, input parameters, and return types
 type Constructor struct {
-	Name    string   // contoh: healthSvc.NewHealthService
-	Params  []string // tipe param input
-	Results []string // tipe return output
+	Name    string   // Example: healthSvc.NewHealthService
+	Params  []string // Input parameter types
+	Results []string // Return output types
 }
 
+// LoadConstructors loads constructor information for specified functions from a package
+// Uses the Go packages API to analyze function signatures and extract type information
+// Returns a map of function names to their constructor information
 func (g *Generator) LoadConstructors(goModDir string, pkgPath string, funcs []string) (map[string]Constructor, error) {
 	cfg := &packages.Config{
 		Mode: packages.NeedTypes | packages.NeedDeps | packages.NeedTypesInfo,
@@ -30,14 +34,11 @@ func (g *Generator) LoadConstructors(goModDir string, pkgPath string, funcs []st
 
 	constructors := make(map[string]Constructor)
 
-	// Loop semua fungsi target
+	// Loop through all target functions
 	for _, fn := range funcs {
-		// fn bisa dalam format: alias.FuncName, misal "healthSvc.NewHealthService"
-		// untuk simplifikasi, kita ambil bagian setelah titik
-		fnName := fn
-		if dot := len(fn) - len(pkgPath); dot > 0 {
-			fnName = fn[dot+1:]
-		}
+		// Function can be in format: alias.FuncName, example "healthSvc.NewHealthService"
+		// For simplification, we extract the part after the dot
+		fnName := extractFunctionName(fn, pkgPath)
 
 		obj := pkgs[0].Types.Scope().Lookup(fnName)
 		if obj == nil {
@@ -50,14 +51,14 @@ func (g *Generator) LoadConstructors(goModDir string, pkgPath string, funcs []st
 			continue
 		}
 
-		// Ambil parameter
+		// Extract parameters
 		var params []string
 		for i := 0; i < sig.Params().Len(); i++ {
 			param := sig.Params().At(i)
 			params = append(params, param.Type().String())
 		}
 
-		// Ambil return
+		// Extract return values
 		var results []string
 		for i := 0; i < sig.Results().Len(); i++ {
 			res := sig.Results().At(i)

@@ -1,27 +1,8 @@
 package generate
 
-import (
-	"fmt"
-	"os"
-	"path/filepath"
-)
-
-// Cari directory go.mod dimulai dari lokasi file tertentu (misal elsabuild.go)
+// FindGoModDir searches upward from a starting path to find the directory containing go.mod
+// This function is useful for locating the Go module root from any file within the module
+// It traverses up the directory tree until it finds a go.mod file or reaches the filesystem root
 func (g *Generator) FindGoModDir(start string) (string, error) {
-	dir := filepath.Dir(start)
-
-	for {
-		// cek apakah ada go.mod di folder ini
-		goModPath := filepath.Join(dir, "go.mod")
-		if _, err := os.Stat(goModPath); err == nil {
-			return dir, nil
-		}
-
-		// kalau sudah di root dan tidak ketemu
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return "", fmt.Errorf("go.mod not found from %s upward", start)
-		}
-		dir = parent
-	}
+	return findGoModDir(start)
 }

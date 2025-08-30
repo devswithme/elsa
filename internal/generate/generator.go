@@ -3,22 +3,24 @@ package generate
 import (
 	"fmt"
 	"go/ast"
-	"go/parser"
-	"go/token"
 	"path/filepath"
-	"strings"
 )
 
 // Generator handles the generation process for finding elsabuild files
+// Manages the parsing and analysis of Go files with elsabuild build tags
 type Generator struct {
 	imports map[string]string
 }
 
 // NewGenerator creates a new Generator instance
+// Initializes a new generator with an empty imports map
 func NewGenerator() *Generator {
 	return &Generator{}
 }
 
+// GenerateDependencies processes all elsabuild files in the target directory
+// Finds files with elsabuild tags and processes their dependencies
+// Returns an error if the process fails, but continues processing other files
 func (g *Generator) GenerateDependencies(targetDir string) error {
 	files, err := g.FindElsabuildFiles(targetDir)
 	if err != nil {
@@ -36,13 +38,16 @@ func (g *Generator) GenerateDependencies(targetDir string) error {
 	return nil
 }
 
+// processGenerateDependencies processes a single file for generation dependencies
+// Extracts functions with elsa.Generate calls and analyzes elsa.Set declarations
+// Loads constructor information for the found functions
 func (g *Generator) processGenerateDependencies(target string) error {
 	goModDir, err := g.FindGoModDir(target)
 	if err != nil {
 		return err
 	}
 
-	// Ekstrak fungsi yang mengandung elsa.Generate
+	// Extract functions containing elsa.Generate
 	funcs, err := g.ExtractElsaGenerateFuncs(target)
 	if err != nil {
 		return err
@@ -71,62 +76,64 @@ func (g *Generator) processGenerateDependencies(target string) error {
 	return nil
 }
 
-// ResultInfo menyimpan informasi return value
+// ResultInfo stores information about return values
+// Contains type information and whether the return value is a struct
 type ResultInfo struct {
-	Type         string
-	IsStruct     bool
-	StructFields []StructFieldInfo
+	Type         string            // Return type
+	IsStruct     bool              // Whether the return type is a struct
+	StructFields []StructFieldInfo // Struct field information if applicable
 }
 
-// StructFieldInfo menyimpan informasi field struct
+// StructFieldInfo stores information about struct fields
+// Contains field name, type, and tags
 type StructFieldInfo struct {
-	Name string
-	Type string
-	Tag  string
+	Name string // Field name
+	Type string // Field type
+	Tag  string // Field tags
 }
 
-// ExtractElsaGenerateFuncs mengekstrak fungsi yang mengandung elsa.Generate
+// ExtractElsaGenerateFuncs extracts functions containing elsa.Generate calls
+// Parses the target file and finds all functions that call elsa.Generate
+// Returns detailed function information including parameters and return types
 func (g *Generator) ExtractElsaGenerateFuncs(target string) ([]FuncInfo, error) {
-	fset := token.NewFileSet()
-
-	// Parse file menjadi AST
-	node, err := parser.ParseFile(fset, target, nil, parser.AllErrors)
+	// Parse file into AST
+	node, err := parseFile(target)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse file: %v", err)
 	}
 
-	// Parse imports untuk mapping alias ke package path
-	g.parseImports(node)
+	// Parse imports for mapping aliases to package paths
+	g.imports = parseImports(node)
 
 	var funcs []FuncInfo
 
-	// Traverse AST untuk mencari fungsi
+	// Traverse AST to find functions
 	ast.Inspect(node, func(n ast.Node) bool {
 		fn, ok := n.(*ast.FuncDecl)
 		if !ok {
 			return true
 		}
 
-		// Cek apakah fungsi mengandung elsa.Generate
+		// Check if function contains elsa.Generate
 		if !containsElsaGenerate(fn) {
 			return true
 		}
 
-		// Ekstrak informasi fungsi
+		// Extract function information
 		funcInfo := FuncInfo{
 			FuncName: fn.Name.Name,
 			PkgName:  node.Name.Name,
 		}
 
-		// Ekstrak parameter dengan package path yang lengkap
+		// Extract parameters with full package paths
 		funcInfo.Params = g.extractParamsWithImports(fn.Type.Params)
 
-		// Ekstrak return values
+		// Extract return values
 		if fn.Type.Results != nil {
 			funcInfo.Results = g.extractResults(fn.Type.Results, target)
 		}
 
-		// Ekstrak parameter dari elsa.Generate
+		// Extract parameters from elsa.Generate
 		funcInfo.GenerateParams = g.extractGenerateParams(fn)
 
 		funcs = append(funcs, funcInfo)
@@ -136,49 +143,27 @@ func (g *Generator) ExtractElsaGenerateFuncs(target string) ([]FuncInfo, error) 
 	return funcs, nil
 }
 
-// parseImports mengumpulkan mapping alias ke package path
-func (g *Generator) parseImports(node *ast.File) {
-	g.imports = make(map[string]string)
-
-	for _, imp := range node.Imports {
-		pkgPath := strings.Trim(imp.Path.Value, `"`)
-		if imp.Name != nil {
-			// alias import, contoh: healthRepo "github.com/xxx/health"
-			g.imports[imp.Name.Name] = pkgPath
-		} else {
-			// tanpa alias → ambil last segment
-			parts := strings.Split(pkgPath, "/")
-			g.imports[parts[len(parts)-1]] = pkgPath
-		}
-	}
-}
-
-// containsElsaGenerate mengecek apakah fungsi mengandung elsa.Generate
+// containsElsaGenerate checks if a function contains elsa.Generate calls
+// Searches through the function body for calls to elsa.Generate
+// Returns true if found, false otherwise
 func containsElsaGenerate(fn *ast.FuncDecl) bool {
 	if fn.Body == nil {
 		return false
 	}
 
-	found := false
-	ast.Inspect(fn.Body, func(n ast.Node) bool {
-		call, ok := n.(*ast.CallExpr)
-		if !ok {
+	calls := findCallExpressions(fn.Body)
+	for _, call := range calls {
+		if isElsaCall(call, "Generate") {
 			return true
 		}
+	}
 
-		if sel, ok := call.Fun.(*ast.SelectorExpr); ok {
-			if x, ok := sel.X.(*ast.Ident); ok && x.Name == "elsa" && sel.Sel.Name == "Generate" {
-				found = true
-				return false
-			}
-		}
-		return true
-	})
-
-	return found
+	return false
 }
 
-// extractGenerateParams mengekstrak parameter dari elsa.Generate
+// extractGenerateParams extracts parameters from elsa.Generate calls
+// Finds elsa.Generate calls in the function body and extracts their arguments
+// Returns a slice of parameter names or string representations
 func (g *Generator) extractGenerateParams(fn *ast.FuncDecl) []string {
 	var params []string
 
@@ -186,41 +171,38 @@ func (g *Generator) extractGenerateParams(fn *ast.FuncDecl) []string {
 		return params
 	}
 
-	ast.Inspect(fn.Body, func(n ast.Node) bool {
-		call, ok := n.(*ast.CallExpr)
-		if !ok {
-			return true
-		}
-
-		if sel, ok := call.Fun.(*ast.SelectorExpr); ok {
-			if x, ok := sel.X.(*ast.Ident); ok && x.Name == "elsa" && sel.Sel.Name == "Generate" {
-				// Ekstrak semua argument dari elsa.Generate
-				for _, arg := range call.Args {
-					if ident, ok := arg.(*ast.Ident); ok {
-						params = append(params, ident.Name)
-					} else {
-						// Fallback untuk expression yang bukan ident
-						params = append(params, exprToString(arg))
-					}
+	calls := findCallExpressions(fn.Body)
+	for _, call := range calls {
+		if isElsaCall(call, "Generate") {
+			// Extract all arguments from elsa.Generate
+			for _, arg := range call.Args {
+				if ident, ok := arg.(*ast.Ident); ok {
+					params = append(params, ident.Name)
+				} else {
+					// Fallback for expressions that aren't identifiers
+					params = append(params, exprToString(arg))
 				}
-				return false
 			}
+			break // Only process the first elsa.Generate call
 		}
-		return true
-	})
+	}
 
 	return params
 }
 
-// extractParamsWithImports mengekstrak parameter dengan package path yang lengkap
+// extractParamsWithImports extracts parameters with full package paths
+// Uses TypeResolver to resolve types with import context
+// Returns parameter information with fully qualified type names
 func (g *Generator) extractParamsWithImports(fieldList *ast.FieldList) []ParamInfo {
 	if fieldList == nil {
 		return nil
 	}
 
+	resolver := NewTypeResolver(g.imports)
 	var params []ParamInfo
+
 	for _, field := range fieldList.List {
-		typ := g.resolveTypeWithImports(field.Type)
+		typ := resolver.ResolveType(field.Type)
 
 		if len(field.Names) > 0 {
 			for _, name := range field.Names {
@@ -239,51 +221,9 @@ func (g *Generator) extractParamsWithImports(fieldList *ast.FieldList) []ParamIn
 	return params
 }
 
-// resolveTypeWithImports resolve tipe data dengan package path yang lengkap
-func (g *Generator) resolveTypeWithImports(expr ast.Expr) string {
-	switch t := expr.(type) {
-	case *ast.Ident:
-		// Cek apakah ini tipe dari package yang di-import
-		if pkgPath, exists := g.imports[t.Name]; exists {
-			// Ini adalah package alias, gunakan package path lengkap
-			return pkgPath + "." + t.Name
-		}
-		// Ini adalah tipe lokal atau built-in
-		return t.Name
-	case *ast.StarExpr:
-		return "*" + g.resolveTypeWithImports(t.X)
-	case *ast.SelectorExpr:
-		// Handle selector expressions seperti package.Type
-		if x, ok := t.X.(*ast.Ident); ok {
-			if pkgPath, exists := g.imports[x.Name]; exists {
-				// Ini adalah package alias, gunakan package path lengkap
-				return pkgPath + "." + t.Sel.Name
-			}
-			// Ini adalah selector dari tipe lokal
-			return x.Name + "." + t.Sel.Name
-		}
-		return exprToString(t)
-	case *ast.ArrayType:
-		return "[]" + g.resolveTypeWithImports(t.Elt)
-	case *ast.MapType:
-		return "map[" + g.resolveTypeWithImports(t.Key) + "]" + g.resolveTypeWithImports(t.Value)
-	case *ast.InterfaceType:
-		return "interface{}"
-	case *ast.FuncType:
-		return "func(...)"
-	case *ast.ChanType:
-		if t.Dir == ast.SEND {
-			return "chan<- " + g.resolveTypeWithImports(t.Value)
-		} else if t.Dir == ast.RECV {
-			return "<-chan " + g.resolveTypeWithImports(t.Value)
-		}
-		return "chan " + g.resolveTypeWithImports(t.Value)
-	default:
-		return exprToString(t)
-	}
-}
-
-// extractResults mengekstrak informasi return values
+// extractResults extracts information about return values
+// Analyzes return types and determines if they are structs
+// Extracts struct field information when applicable
 func (g *Generator) extractResults(fieldList *ast.FieldList, filePath string) []ResultInfo {
 	if fieldList == nil {
 		return nil
@@ -297,7 +237,7 @@ func (g *Generator) extractResults(fieldList *ast.FieldList, filePath string) []
 			Type: typ,
 		}
 
-		// Cek apakah ini struct type
+		// Check if this is a struct type
 		if g.isStructType(field.Type, filePath) {
 			resultInfo.IsStruct = true
 			resultInfo.StructFields = g.extractStructFields(field.Type, filePath)
@@ -308,55 +248,39 @@ func (g *Generator) extractResults(fieldList *ast.FieldList, filePath string) []
 	return results
 }
 
-// isStructType mengecek apakah tipe adalah struct secara dinamis
+// isStructType checks if a type is a struct dynamically
+// Analyzes the type expression to determine if it represents a struct
+// May require file parsing for complete type information
 func (g *Generator) isStructType(expr ast.Expr, filePath string) bool {
 	switch t := expr.(type) {
 	case *ast.StarExpr:
 		return g.isStructType(t.X, filePath)
 	case *ast.Ident:
-		// Cek apakah ada definisi struct dengan nama ini di file
+		// Check if there's a struct definition with this name in the file
 		return g.hasStructDefinition(t.Name, filePath)
 	case *ast.SelectorExpr:
-		// Ini bisa jadi struct dari package lain
+		// This could be a struct from another package
 		return true
 	default:
 		return false
 	}
 }
 
-// hasStructDefinition mengecek apakah ada definisi struct dengan nama tertentu
+// hasStructDefinition checks if there's a struct definition with a specific name
+// Parses the file to search for struct type declarations
+// Returns true if a struct with the given name is found
 func (g *Generator) hasStructDefinition(structName string, filePath string) bool {
-	fset := token.NewFileSet()
-	node, err := parser.ParseFile(fset, filePath, nil, parser.AllErrors)
+	node, err := parseFile(filePath)
 	if err != nil {
 		return false
 	}
 
-	found := false
-	ast.Inspect(node, func(n ast.Node) bool {
-		typeDecl, ok := n.(*ast.TypeSpec)
-		if !ok {
-			return true
-		}
-
-		// Cek apakah nama struct cocok
-		if typeDecl.Name.Name != structName {
-			return true
-		}
-
-		// Cek apakah ini struct type
-		_, ok = typeDecl.Type.(*ast.StructType)
-		if ok {
-			found = true
-			return false // Stop traversal setelah ketemu
-		}
-		return true
-	})
-
-	return found
+	return findStructByName(node, structName) != nil
 }
 
-// extractStructFields mengekstrak field dari struct secara dinamis
+// extractStructFields extracts fields from structs dynamically
+// Handles different type expressions and finds struct definitions
+// Returns field information for the struct type
 func (g *Generator) extractStructFields(expr ast.Expr, filePath string) []StructFieldInfo {
 	var fields []StructFieldInfo
 
@@ -365,54 +289,40 @@ func (g *Generator) extractStructFields(expr ast.Expr, filePath string) []Struct
 		// Handle pointer types
 		return g.extractStructFields(t.X, filePath)
 	case *ast.Ident:
-		// Cari definisi struct dengan nama ini
+		// Find struct definition with this name
 		return g.findStructDefinition(t.Name, filePath)
 	case *ast.SelectorExpr:
-		// Handle selector expressions seperti package.Type
+		// Handle selector expressions like package.Type
 		return g.findStructDefinition(exprToString(t), filePath)
 	}
 
 	return fields
 }
 
-// findStructDefinition mencari definisi struct berdasarkan nama
+// findStructDefinition finds struct definition by name
+// Parses the file to locate struct type declarations
+// Returns field information if the struct is found
 func (g *Generator) findStructDefinition(structName string, filePath string) []StructFieldInfo {
 	var fields []StructFieldInfo
 
-	// Parse file untuk mencari definisi struct
-	fset := token.NewFileSet()
-	node, err := parser.ParseFile(fset, filePath, nil, parser.AllErrors)
+	// Parse file to find struct definition
+	node, err := parseFile(filePath)
 	if err != nil {
 		return fields
 	}
 
-	// Traverse AST untuk mencari struct declaration
-	ast.Inspect(node, func(n ast.Node) bool {
-		typeDecl, ok := n.(*ast.TypeSpec)
-		if !ok {
-			return true
-		}
-
-		// Cek apakah nama struct cocok
-		if typeDecl.Name.Name != structName {
-			return true
-		}
-
-		// Cek apakah ini struct type
-		structType, ok := typeDecl.Type.(*ast.StructType)
-		if !ok {
-			return true
-		}
-
-		// Ekstrak field dari struct
+	// Find struct by name
+	structType := findStructByName(node, structName)
+	if structType != nil {
 		fields = g.extractStructFieldsFromAST(structType)
-		return false // Stop traversal setelah ketemu
-	})
+	}
 
 	return fields
 }
 
-// extractStructFieldsFromAST mengekstrak field dari AST struct type
+// extractStructFieldsFromAST extracts fields from AST struct type
+// Processes the AST representation of a struct to extract field information
+// Uses TypeResolver to get full package paths for field types
 func (g *Generator) extractStructFieldsFromAST(structType *ast.StructType) []StructFieldInfo {
 	var fields []StructFieldInfo
 
@@ -420,9 +330,10 @@ func (g *Generator) extractStructFieldsFromAST(structType *ast.StructType) []Str
 		return fields
 	}
 
+	resolver := NewTypeResolver(g.imports)
 	for _, field := range structType.Fields.List {
-		// Gunakan resolveTypeWithImports untuk mendapatkan package path lengkap
-		fieldType := g.resolveTypeWithImports(field.Type)
+		// Use TypeResolver to get full package paths
+		fieldType := resolver.ResolveType(field.Type)
 
 		if len(field.Names) > 0 {
 			for _, name := range field.Names {
@@ -443,41 +354,4 @@ func (g *Generator) extractStructFieldsFromAST(structType *ast.StructType) []Str
 	}
 
 	return fields
-}
-
-// extractFieldTag mengekstrak tag dari field
-func extractFieldTag(tag *ast.BasicLit) string {
-	if tag == nil {
-		return ""
-	}
-	return tag.Value
-}
-
-// exprToString mengkonversi AST expression ke string
-func exprToString(expr ast.Expr) string {
-	switch t := expr.(type) {
-	case *ast.Ident:
-		return t.Name
-	case *ast.StarExpr:
-		return "*" + exprToString(t.X)
-	case *ast.SelectorExpr:
-		return exprToString(t.X) + "." + t.Sel.Name
-	case *ast.ArrayType:
-		return "[]" + exprToString(t.Elt)
-	case *ast.MapType:
-		return "map[" + exprToString(t.Key) + "]" + exprToString(t.Value)
-	case *ast.InterfaceType:
-		return "interface{}"
-	case *ast.FuncType:
-		return "func(...)"
-	case *ast.ChanType:
-		if t.Dir == ast.SEND {
-			return "chan<- " + exprToString(t.Value)
-		} else if t.Dir == ast.RECV {
-			return "<-chan " + exprToString(t.Value)
-		}
-		return "chan " + exprToString(t.Value)
-	default:
-		return fmt.Sprintf("%T", t)
-	}
 }
