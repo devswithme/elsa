@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/risoftinc/elsa/cmd"
+	cmd "github.com/risoftinc/elsa/cmd/root"
 )
 
 var (
