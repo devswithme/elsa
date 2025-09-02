@@ -243,7 +243,7 @@ func (g *Generator) GenerateElsaGenFile(target string, elsaGenFile ElsaGenFile) 
 		return fmt.Errorf("failed to write elsa_gen.go: %v", err)
 	}
 
-	fmt.Printf("Generated: %s\n", outputPath)
+	fmt.Printf("Generated: %s from %s\n", outputPath, elsaGenFile.Target)
 	return nil
 }
 
