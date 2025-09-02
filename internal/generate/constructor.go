@@ -19,20 +19,20 @@ type Constructor struct {
 // LoadConstructors loads constructor information for specified functions from a package
 // Uses the Go packages API to analyze function signatures and extract type information
 // Returns a map of function names to their constructor information
-func (g *Generator) LoadConstructors(goModDir string, pkgPath string, funcs []string) (map[string]Constructor, error) {
+func (g *Generator) LoadConstructors(goModDir string, pkgPath string, funcs []string) (Constructor, error) {
 	cfg := &packages.Config{
 		Mode: packages.NeedTypes | packages.NeedDeps | packages.NeedTypesInfo,
 		Dir:  goModDir,
 	}
 	pkgs, err := packages.Load(cfg, pkgPath)
 	if err != nil {
-		return nil, err
+		return Constructor{}, err
 	}
 	if len(pkgs) == 0 {
-		return nil, fmt.Errorf("package not found: %s", pkgPath)
+		return Constructor{}, fmt.Errorf("package not found: %s", pkgPath)
 	}
 
-	constructors := make(map[string]Constructor)
+	var constructors Constructor
 
 	// Loop through all target functions
 	for _, fn := range funcs {
@@ -65,7 +65,7 @@ func (g *Generator) LoadConstructors(goModDir string, pkgPath string, funcs []st
 			results = append(results, res.Type().String())
 		}
 
-		constructors[fn] = Constructor{
+		constructors = Constructor{
 			Name:    fn,
 			Params:  params,
 			Results: results,

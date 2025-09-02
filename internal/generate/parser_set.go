@@ -28,7 +28,7 @@ type ParamInfo struct {
 // Key = variable name (RepositorySet, ServicesSet, etc.)
 // Value = list of functions inside elsa.Set(...) calls
 // This function analyzes Go AST to find elsa.Set declarations and extract function information
-func (g *Generator) ParseElsaSets(path string) (map[string][]FuncInfo, error) {
+func (g *Generator) ParseElsaSets(goModDir, path string) (map[string][]FuncInfo, error) {
 	// Parse file into AST
 	node, err := parseFile(path)
 	if err != nil {
@@ -94,6 +94,23 @@ func (g *Generator) ParseElsaSets(path string) (map[string][]FuncInfo, error) {
 					}
 				}
 				results[name.Name] = funcs
+			}
+		}
+	}
+
+	for key, result := range results {
+		for x, s := range result {
+			constructors, err := g.LoadConstructors(goModDir, s.PkgPath, []string{s.FuncName})
+			if err != nil {
+				return nil, err
+			}
+
+			for _, c := range constructors.Params {
+				results[key][x].Params = append(results[key][x].Params, ParamInfo{Type: c})
+			}
+
+			for _, c := range constructors.Results {
+				results[key][x].Results = append(results[key][x].Results, ResultInfo{Type: c})
 			}
 		}
 	}

@@ -5,9 +5,11 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode"
 )
 
 // Common utility functions for the generate package
@@ -119,4 +121,75 @@ func safeWalk(root string, fn filepath.WalkFunc) error {
 		}
 		return fn(path, info, err)
 	})
+}
+
+type TypeInfo struct {
+	ParamName  string
+	Package    string
+	UsePointer bool
+	DataType   string
+	Alias      string
+}
+
+func extractType(input string) TypeInfo {
+	ti := TypeInfo{}
+
+	// cek prefix *
+	if strings.HasPrefix(input, "*") {
+		ti.UsePointer = true
+		input = strings.TrimPrefix(input, "*")
+	}
+
+	// pisahkan antara package path & type
+	lastDot := strings.LastIndex(input, ".")
+	if lastDot != -1 {
+		ti.Package = input[:lastDot]
+		ti.DataType = input[lastDot+1:]
+	} else {
+		ti.Package = input
+		ti.DataType = input
+	}
+
+	// alias = segment terakhir dari package path
+	alias := ti.Package
+	if idx := strings.LastIndex(alias, "/"); idx != -1 {
+		alias = alias[idx+1:]
+	}
+	ti.Alias = alias
+
+	return ti
+}
+
+func lowerFirst(s string) string {
+	if s == "" {
+		return s
+	}
+
+	runes := []rune(s)
+	runes[0] = unicode.ToLower(runes[0])
+	return string(runes)
+}
+
+func removeArrayByIndex[T any](s []T, index int) []T {
+	if index < 0 || index >= len(s) {
+		// kalau index invalid, balikin slice asli
+		return s
+	}
+	return append(s[:index], s[index+1:]...)
+}
+
+func isBuiltinType(name string) bool {
+	// pakai Default importer (bawaannya Go)
+	scope := types.Universe
+	obj := scope.Lookup(name)
+	if obj == nil {
+		return false
+	}
+	// cek apakah object itu sebuah tipe
+	_, ok := obj.Type().Underlying().(*types.Basic)
+	return ok
+}
+
+func getNameFile(path string) string {
+	return strings.Split(path, "\\")[len(strings.Split(path, "\\"))-1]
 }
