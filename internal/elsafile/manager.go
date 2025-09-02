@@ -148,7 +148,11 @@ func (em *Manager) ExecuteShellCommand(command string) error {
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 
-	return cmd.Run()
+	if err := cmd.Run(); err != nil {
+		fmt.Println(err.Error())
+	}
+
+	return nil
 }
 
 // HasConflict checks if a command name conflicts with built-in commands

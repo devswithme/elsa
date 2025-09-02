@@ -5,6 +5,7 @@ import (
 	"runtime"
 
 	"github.com/risoftinc/elsa/cmd/elsafile"
+	"github.com/risoftinc/elsa/cmd/generate"
 	"github.com/risoftinc/elsa/cmd/migrate"
 	"github.com/risoftinc/elsa/cmd/watch"
 	"github.com/risoftinc/elsa/constants"
@@ -45,6 +46,10 @@ func init() {
 	rootCmd.AddCommand(elsafile.InitCmd)
 	rootCmd.AddCommand(elsafile.RunCmd)
 	rootCmd.AddCommand(elsafile.ListCmd)
+
+	// Add generate commands
+	rootCmd.AddCommand(generate.GenerateCmd)
+	rootCmd.AddCommand(generate.GenCmd)
 }
 
 // SetVersionInfo sets the version information for the application
