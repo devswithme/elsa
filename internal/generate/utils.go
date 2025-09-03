@@ -151,6 +151,14 @@ func extractType(input string) TypeInfo {
 		input = strings.TrimPrefix(input, "*")
 	}
 
+	// Check if this is a builtin type
+	if isBuiltinType(input) {
+		ti.Package = ""
+		ti.DataType = input
+		ti.Alias = ""
+		return ti
+	}
+
 	// pisahkan antara package path & type
 	lastDot := strings.LastIndex(input, ".")
 	if lastDot != -1 {
