@@ -398,21 +398,31 @@ func (g *Generator) generateReturnStatement(function ElsaGenFunction, elsaGenFil
 
 		// Generate return value based on type
 		if structContent != "" {
-			// For struct types, use struct literal
+			// For struct types with field assignments, use struct literal
 			if result.UsePointer {
 				content += "&" + result.Package + structContent
 			} else {
 				content += result.Package + structContent
 			}
 		} else {
-			// For non-struct types, we need to return a variable name or default value
-			// Find the variable name from source packages
-			key := fmt.Sprintf("%s.%s", result.Package, result.DataType)
-			if source, exists := function.SourcePackages[key]; exists {
-				content += source.VariableName
+			// Check if this is a struct type
+			if _, isStruct := elsaGenFile.StructsData[result.Package]; isStruct {
+				// For struct types without field assignments, use empty struct literal
+				if result.UsePointer {
+					content += "&" + result.Package + "{}"
+				} else {
+					content += result.Package + "{}"
+				}
 			} else {
-				// Fallback: return default value based on type
-				content += getDefaultValueForType(result)
+				// For non-struct types, we need to return a variable name or default value
+				// Find the variable name from source packages
+				key := fmt.Sprintf("%s.%s", result.Package, result.DataType)
+				if source, exists := function.SourcePackages[key]; exists {
+					content += source.VariableName
+				} else {
+					// Fallback: return default value based on type
+					content += getDefaultValueForType(result)
+				}
 			}
 		}
 	}
