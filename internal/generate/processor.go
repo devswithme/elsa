@@ -20,6 +20,7 @@ type (
 		Functions        map[string]ElsaGenFunction
 		FuncGenerated    map[string][]FuncInfo
 		Sets             map[string][]FuncInfo
+		AliasCounter     map[string]int
 	}
 
 	ElsaImportedPackages struct {
@@ -189,7 +190,12 @@ func (g *Generator) generateElsaGenStructs(elsaGenFile ElsaGenFile) string {
 				typeName = et.DataType
 			} else {
 				// Custom type, use alias + DataType
-				typeName = elsaGenFile.ImportedPackages[et.Package].Alias + "." + et.DataType
+				if importedPkg, exists := elsaGenFile.ImportedPackages[et.Package]; exists && importedPkg.Alias != "" {
+					typeName = importedPkg.Alias + "." + et.DataType
+				} else {
+					// Fallback to DataType only if no alias found
+					typeName = et.DataType
+				}
 			}
 
 			// Create padding spaces for alignment
@@ -424,35 +430,63 @@ func (g *Generator) generateReturnStatement(function ElsaGenFunction, elsaGenFil
 func (g *Generator) generateStructContent(result TypeInfo, function ElsaGenFunction, elsaGenFile ElsaGenFile) string {
 	structContent := ""
 	if structFields, exists := elsaGenFile.StructsData[result.Package]; exists {
+		// First pass: collect all assignments and find max field name length
+		var assignments []struct {
+			fieldName string
+			value     string
+		}
+		maxFieldNameLength := 0
+
 		for _, structData := range structFields {
 			// Check if this is a builtin type
 			et := extractType(structData.Type)
 			var variableName string
+			var found bool
 
 			if et.Package == "" {
 				// Builtin type, look for matching parameter in function
 				key := fmt.Sprintf("%s.%s", et.Package, et.DataType) // This will be ".string"
 				if source, exists := function.SourcePackages[key]; exists {
 					variableName = source.VariableName
-				} else {
-					// Fallback to default value
-					variableName = g.getDefaultValueForType(et)
+					found = true
+					if source.UsePointer {
+						variableName = "*" + source.VariableName
+					}
 				}
 			} else {
 				// Custom type, look up in SourcePackages
 				key := fmt.Sprintf("%s.%s", et.Package, et.DataType)
 				if source, exists := function.SourcePackages[key]; exists {
 					variableName = source.VariableName
-				} else {
-					// Fallback to default value
-					variableName = g.getDefaultValueForType(et)
+					found = true
+					if source.UsePointer {
+						variableName = "*" + source.VariableName
+					}
 				}
 			}
 
-			structContent += fmt.Sprintf("\t\t%s: %s,\n",
-				structData.Name,
-				variableName)
+			// Only add assignment if we found a matching variable
+			if found {
+				assignments = append(assignments, struct {
+					fieldName string
+					value     string
+				}{structData.Name, variableName})
+
+				if len(structData.Name) > maxFieldNameLength {
+					maxFieldNameLength = len(structData.Name)
+				}
+			}
 		}
+
+		// Second pass: generate aligned assignments
+		for _, assignment := range assignments {
+			padding := strings.Repeat(" ", maxFieldNameLength-len(assignment.fieldName))
+			structContent += fmt.Sprintf("\t\t%s:%s %s,\n",
+				assignment.fieldName,
+				padding,
+				assignment.value)
+		}
+
 		if structContent != "" {
 			structContent = "{\n" + structContent + "\t}"
 		}
@@ -494,6 +528,7 @@ func (g *Generator) initializeElsaGenFile(target string) (*ElsaGenFile, error) {
 		Functions:        make(map[string]ElsaGenFunction),
 		FuncGenerated:    make(map[string][]FuncInfo),
 		Sets:             sets,
+		AliasCounter:     make(map[string]int),
 	}
 
 	// Process each function
@@ -594,6 +629,8 @@ func (g *Generator) processFunctionParams(elsaGenFile *ElsaGenFile, fn FuncInfo)
 // when the result is a struct type. This information is used for struct generation.
 // The function does not return an error as it handles missing data gracefully.
 func (g *Generator) processFunctionResults(elsaGenFile *ElsaGenFile, fn FuncInfo) {
+	funcSetImportedPackages := g.createImportPackageSetter(elsaGenFile)
+
 	for _, result := range fn.Results {
 		typeInfo := extractType(result.Type)
 
@@ -602,10 +639,19 @@ func (g *Generator) processFunctionResults(elsaGenFile *ElsaGenFile, fn FuncInfo
 		funcData.Results = append(funcData.Results, typeInfo)
 		elsaGenFile.Functions[fn.FuncName] = funcData
 
+		// Set imported packages for result type
+		funcSetImportedPackages(typeInfo)
+
 		// Extract struct data if needed
 		if result.IsStruct {
 			if _, exists := elsaGenFile.StructsData[typeInfo.Package]; !exists {
 				elsaGenFile.StructsData[typeInfo.Package] = result.StructFields
+
+				// Register import packages for struct fields
+				for _, structField := range result.StructFields {
+					fieldTypeInfo := extractType(structField.Type)
+					funcSetImportedPackages(fieldTypeInfo)
+				}
 			}
 		}
 	}
@@ -710,16 +756,17 @@ func (g *Generator) resolveVariableNameConflicts(elsaGenFile *ElsaGenFile, funcN
 // The returned function can be used to register import packages with proper alias management.
 // This ensures unique package aliases in the generated import section.
 func (g *Generator) createImportPackageSetter(elsaGenFile *ElsaGenFile) func(TypeInfo) {
-	counterAlias := make(map[string]int)
-	// Default import packages "elsa"
-	counterAlias["elsa"]++
+	// Initialize default import packages "elsa"
+	if elsaGenFile.AliasCounter["elsa"] == 0 {
+		elsaGenFile.AliasCounter["elsa"]++
+	}
 
 	return func(typeInfo TypeInfo) {
 		if _, exists := elsaGenFile.ImportedPackages[typeInfo.Package]; !exists {
-			counterAlias[typeInfo.Alias]++
+			elsaGenFile.AliasCounter[typeInfo.Alias]++
 			useAlias := false
-			if counterAlias[typeInfo.Alias] > 1 {
-				typeInfo.Alias = fmt.Sprintf("%s%d", typeInfo.Alias, counterAlias[typeInfo.Alias])
+			if elsaGenFile.AliasCounter[typeInfo.Alias] > 1 {
+				typeInfo.Alias = fmt.Sprintf("%s%d", typeInfo.Alias, elsaGenFile.AliasCounter[typeInfo.Alias])
 				useAlias = true
 			}
 			elsaGenFile.ImportedPackages[typeInfo.Package] = ElsaImportedPackages{
