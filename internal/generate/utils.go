@@ -212,3 +212,105 @@ func isBuiltinType(name string) bool {
 func getNameFile(path string) string {
 	return strings.Split(path, "\\")[len(strings.Split(path, "\\"))-1]
 }
+
+// validateGoCode validates the generated Go code for syntax correctness.
+// This function uses the Go parser to check if the generated code has valid syntax.
+// It also performs additional semantic checks to catch logical errors.
+// This ensures that the generated code is syntactically and semantically correct before writing to file.
+// Returns an error if the code contains syntax errors, semantic errors, or parsing fails.
+func validateGoCode(content string) error {
+	fset := token.NewFileSet()
+	_, err := parser.ParseFile(fset, "generated.go", content, parser.ParseComments)
+	if err != nil {
+		return fmt.Errorf("invalid Go syntax: %v", err)
+	}
+
+	// Additional semantic validation
+	if err := validateSemanticErrors(content); err != nil {
+		return fmt.Errorf("semantic error: %v", err)
+	}
+
+	return nil
+}
+
+// validateSemanticErrors performs additional semantic validation on the generated code.
+// This function checks for common logical errors that the Go parser might not catch.
+// It looks for patterns like bare type names in return statements or function calls.
+// Returns an error if semantic issues are found.
+func validateSemanticErrors(content string) error {
+	lines := strings.Split(content, "\n")
+
+	for i, line := range lines {
+		line = strings.TrimSpace(line)
+
+		// Check for bare type names in return statements (including continuation lines)
+		if strings.HasPrefix(line, "return ") || strings.HasPrefix(line, "}, ") {
+			// Check for bare type names in return statements
+			// Look for patterns like "return string", "return int", "return ..., string", "}, string"
+			if strings.Contains(line, ", string") || strings.Contains(line, ", int") ||
+				strings.Contains(line, ", bool") || strings.Contains(line, ", float") ||
+				strings.HasSuffix(strings.TrimSpace(line), " string") ||
+				strings.HasSuffix(strings.TrimSpace(line), " int") ||
+				strings.HasSuffix(strings.TrimSpace(line), " bool") ||
+				strings.HasSuffix(strings.TrimSpace(line), " float") {
+				// Check if it's a string literal (contains quotes) - if so, it's valid
+				if strings.Contains(line, `"`) {
+					continue // Skip validation for string literals
+				}
+				return fmt.Errorf("line %d: bare type name in return statement: %s", i+1, line)
+			}
+		}
+
+		// Check for bare type names in function calls (but not function signatures)
+		if strings.Contains(line, "(") && strings.Contains(line, ")") {
+			// Skip function signatures (lines starting with "func ")
+			if strings.HasPrefix(line, "func ") {
+				continue
+			}
+			// Look for patterns like "func(..., string)" or "func(..., int)" in function calls
+			if strings.Contains(line, ", string)") || strings.Contains(line, ", int)") ||
+				strings.Contains(line, ", bool)") || strings.Contains(line, ", float)") {
+				return fmt.Errorf("line %d: bare type name in function call: %s", i+1, line)
+			}
+		}
+	}
+
+	return nil
+}
+
+// getDefaultValueForType returns the appropriate default value for a given type.
+// This function handles built-in Go types and returns their zero values.
+// For pointer types, it returns nil. For value types, it returns the appropriate zero value.
+// Returns the default value as a string that can be used in Go code.
+func getDefaultValueForType(result TypeInfo) string {
+	// Handle pointer types
+	if result.UsePointer {
+		return "nil"
+	}
+
+	// Handle built-in types
+	switch result.DataType {
+	case "string":
+		return `""`
+	case "int", "int8", "int16", "int32", "int64":
+		return "0"
+	case "uint", "uint8", "uint16", "uint32", "uint64":
+		return "0"
+	case "float32", "float64":
+		return "0"
+	case "bool":
+		return "false"
+	case "byte":
+		return "0"
+	case "rune":
+		return "0"
+	case "complex64", "complex128":
+		return "0"
+	case "error":
+		return "nil"
+	default:
+		// For custom types, try to use the type name in lowercase
+		// This is a fallback for unknown types
+		return lowerFirst(result.DataType)
+	}
+}

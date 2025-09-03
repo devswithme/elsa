@@ -2,8 +2,6 @@ package generate
 
 import (
 	"fmt"
-	"go/parser"
-	"go/token"
 	"os"
 	"path/filepath"
 	"sort"
@@ -20,6 +18,7 @@ type (
 		Functions        map[string]ElsaGenFunction
 		FuncGenerated    map[string][]FuncInfo
 		Sets             map[string][]FuncInfo
+		AliasCounter     map[string]int
 	}
 
 	ElsaImportedPackages struct {
@@ -66,7 +65,7 @@ func (g *Generator) GenerateElsaGenFile(target string, elsaGenFile ElsaGenFile) 
 	content := g.generateElsaGenContent(elsaGenFile)
 
 	// Validate the generated Go code
-	if err := g.validateGoCode(content); err != nil {
+	if err := validateGoCode(content); err != nil {
 		return fmt.Errorf("generated code validation failed: %v", err)
 	}
 
@@ -189,7 +188,12 @@ func (g *Generator) generateElsaGenStructs(elsaGenFile ElsaGenFile) string {
 				typeName = et.DataType
 			} else {
 				// Custom type, use alias + DataType
-				typeName = elsaGenFile.ImportedPackages[et.Package].Alias + "." + et.DataType
+				if importedPkg, exists := elsaGenFile.ImportedPackages[et.Package]; exists && importedPkg.Alias != "" {
+					typeName = importedPkg.Alias + "." + et.DataType
+				} else {
+					// Fallback to DataType only if no alias found
+					typeName = et.DataType
+				}
 			}
 
 			// Create padding spaces for alignment
@@ -408,7 +412,7 @@ func (g *Generator) generateReturnStatement(function ElsaGenFunction, elsaGenFil
 				content += source.VariableName
 			} else {
 				// Fallback: return default value based on type
-				content += g.getDefaultValueForType(result)
+				content += getDefaultValueForType(result)
 			}
 		}
 	}
@@ -424,35 +428,63 @@ func (g *Generator) generateReturnStatement(function ElsaGenFunction, elsaGenFil
 func (g *Generator) generateStructContent(result TypeInfo, function ElsaGenFunction, elsaGenFile ElsaGenFile) string {
 	structContent := ""
 	if structFields, exists := elsaGenFile.StructsData[result.Package]; exists {
+		// First pass: collect all assignments and find max field name length
+		var assignments []struct {
+			fieldName string
+			value     string
+		}
+		maxFieldNameLength := 0
+
 		for _, structData := range structFields {
 			// Check if this is a builtin type
 			et := extractType(structData.Type)
 			var variableName string
+			var found bool
 
 			if et.Package == "" {
 				// Builtin type, look for matching parameter in function
 				key := fmt.Sprintf("%s.%s", et.Package, et.DataType) // This will be ".string"
 				if source, exists := function.SourcePackages[key]; exists {
 					variableName = source.VariableName
-				} else {
-					// Fallback to default value
-					variableName = g.getDefaultValueForType(et)
+					found = true
+					if source.UsePointer {
+						variableName = "*" + source.VariableName
+					}
 				}
 			} else {
 				// Custom type, look up in SourcePackages
 				key := fmt.Sprintf("%s.%s", et.Package, et.DataType)
 				if source, exists := function.SourcePackages[key]; exists {
 					variableName = source.VariableName
-				} else {
-					// Fallback to default value
-					variableName = g.getDefaultValueForType(et)
+					found = true
+					if source.UsePointer {
+						variableName = "*" + source.VariableName
+					}
 				}
 			}
 
-			structContent += fmt.Sprintf("\t\t%s: %s,\n",
-				structData.Name,
-				variableName)
+			// Only add assignment if we found a matching variable
+			if found {
+				assignments = append(assignments, struct {
+					fieldName string
+					value     string
+				}{structData.Name, variableName})
+
+				if len(structData.Name) > maxFieldNameLength {
+					maxFieldNameLength = len(structData.Name)
+				}
+			}
 		}
+
+		// Second pass: generate aligned assignments
+		for _, assignment := range assignments {
+			padding := strings.Repeat(" ", maxFieldNameLength-len(assignment.fieldName))
+			structContent += fmt.Sprintf("\t\t%s:%s %s,\n",
+				assignment.fieldName,
+				padding,
+				assignment.value)
+		}
+
 		if structContent != "" {
 			structContent = "{\n" + structContent + "\t}"
 		}
@@ -494,6 +526,7 @@ func (g *Generator) initializeElsaGenFile(target string) (*ElsaGenFile, error) {
 		Functions:        make(map[string]ElsaGenFunction),
 		FuncGenerated:    make(map[string][]FuncInfo),
 		Sets:             sets,
+		AliasCounter:     make(map[string]int),
 	}
 
 	// Process each function
@@ -594,6 +627,8 @@ func (g *Generator) processFunctionParams(elsaGenFile *ElsaGenFile, fn FuncInfo)
 // when the result is a struct type. This information is used for struct generation.
 // The function does not return an error as it handles missing data gracefully.
 func (g *Generator) processFunctionResults(elsaGenFile *ElsaGenFile, fn FuncInfo) {
+	funcSetImportedPackages := g.createImportPackageSetter(elsaGenFile)
+
 	for _, result := range fn.Results {
 		typeInfo := extractType(result.Type)
 
@@ -602,10 +637,19 @@ func (g *Generator) processFunctionResults(elsaGenFile *ElsaGenFile, fn FuncInfo
 		funcData.Results = append(funcData.Results, typeInfo)
 		elsaGenFile.Functions[fn.FuncName] = funcData
 
+		// Set imported packages for result type
+		funcSetImportedPackages(typeInfo)
+
 		// Extract struct data if needed
 		if result.IsStruct {
 			if _, exists := elsaGenFile.StructsData[typeInfo.Package]; !exists {
 				elsaGenFile.StructsData[typeInfo.Package] = result.StructFields
+
+				// Register import packages for struct fields
+				for _, structField := range result.StructFields {
+					fieldTypeInfo := extractType(structField.Type)
+					funcSetImportedPackages(fieldTypeInfo)
+				}
 			}
 		}
 	}
@@ -710,16 +754,17 @@ func (g *Generator) resolveVariableNameConflicts(elsaGenFile *ElsaGenFile, funcN
 // The returned function can be used to register import packages with proper alias management.
 // This ensures unique package aliases in the generated import section.
 func (g *Generator) createImportPackageSetter(elsaGenFile *ElsaGenFile) func(TypeInfo) {
-	counterAlias := make(map[string]int)
-	// Default import packages "elsa"
-	counterAlias["elsa"]++
+	// Initialize default import packages "elsa"
+	if elsaGenFile.AliasCounter["elsa"] == 0 {
+		elsaGenFile.AliasCounter["elsa"]++
+	}
 
 	return func(typeInfo TypeInfo) {
 		if _, exists := elsaGenFile.ImportedPackages[typeInfo.Package]; !exists {
-			counterAlias[typeInfo.Alias]++
+			elsaGenFile.AliasCounter[typeInfo.Alias]++
 			useAlias := false
-			if counterAlias[typeInfo.Alias] > 1 {
-				typeInfo.Alias = fmt.Sprintf("%s%d", typeInfo.Alias, counterAlias[typeInfo.Alias])
+			if elsaGenFile.AliasCounter[typeInfo.Alias] > 1 {
+				typeInfo.Alias = fmt.Sprintf("%s%d", typeInfo.Alias, elsaGenFile.AliasCounter[typeInfo.Alias])
 				useAlias = true
 			}
 			elsaGenFile.ImportedPackages[typeInfo.Package] = ElsaImportedPackages{
@@ -727,107 +772,5 @@ func (g *Generator) createImportPackageSetter(elsaGenFile *ElsaGenFile) func(Typ
 				UseAlias: useAlias,
 			}
 		}
-	}
-}
-
-// validateGoCode validates the generated Go code for syntax correctness.
-// This function uses the Go parser to check if the generated code has valid syntax.
-// It also performs additional semantic checks to catch logical errors.
-// This ensures that the generated code is syntactically and semantically correct before writing to file.
-// Returns an error if the code contains syntax errors, semantic errors, or parsing fails.
-func (g *Generator) validateGoCode(content string) error {
-	fset := token.NewFileSet()
-	_, err := parser.ParseFile(fset, "generated.go", content, parser.ParseComments)
-	if err != nil {
-		return fmt.Errorf("invalid Go syntax: %v", err)
-	}
-
-	// Additional semantic validation
-	if err := g.validateSemanticErrors(content); err != nil {
-		return fmt.Errorf("semantic error: %v", err)
-	}
-
-	return nil
-}
-
-// validateSemanticErrors performs additional semantic validation on the generated code.
-// This function checks for common logical errors that the Go parser might not catch.
-// It looks for patterns like bare type names in return statements or function calls.
-// Returns an error if semantic issues are found.
-func (g *Generator) validateSemanticErrors(content string) error {
-	lines := strings.Split(content, "\n")
-
-	for i, line := range lines {
-		line = strings.TrimSpace(line)
-
-		// Check for bare type names in return statements (including continuation lines)
-		if strings.HasPrefix(line, "return ") || strings.HasPrefix(line, "}, ") {
-			// Check for bare type names in return statements
-			// Look for patterns like "return string", "return int", "return ..., string", "}, string"
-			if strings.Contains(line, ", string") || strings.Contains(line, ", int") ||
-				strings.Contains(line, ", bool") || strings.Contains(line, ", float") ||
-				strings.HasSuffix(strings.TrimSpace(line), " string") ||
-				strings.HasSuffix(strings.TrimSpace(line), " int") ||
-				strings.HasSuffix(strings.TrimSpace(line), " bool") ||
-				strings.HasSuffix(strings.TrimSpace(line), " float") {
-				// Check if it's a string literal (contains quotes) - if so, it's valid
-				if strings.Contains(line, `"`) {
-					continue // Skip validation for string literals
-				}
-				return fmt.Errorf("line %d: bare type name in return statement: %s", i+1, line)
-			}
-		}
-
-		// Check for bare type names in function calls (but not function signatures)
-		if strings.Contains(line, "(") && strings.Contains(line, ")") {
-			// Skip function signatures (lines starting with "func ")
-			if strings.HasPrefix(line, "func ") {
-				continue
-			}
-			// Look for patterns like "func(..., string)" or "func(..., int)" in function calls
-			if strings.Contains(line, ", string)") || strings.Contains(line, ", int)") ||
-				strings.Contains(line, ", bool)") || strings.Contains(line, ", float)") {
-				return fmt.Errorf("line %d: bare type name in function call: %s", i+1, line)
-			}
-		}
-	}
-
-	return nil
-}
-
-// getDefaultValueForType returns the appropriate default value for a given type.
-// This function handles built-in Go types and returns their zero values.
-// For pointer types, it returns nil. For value types, it returns the appropriate zero value.
-// Returns the default value as a string that can be used in Go code.
-func (g *Generator) getDefaultValueForType(result TypeInfo) string {
-	// Handle pointer types
-	if result.UsePointer {
-		return "nil"
-	}
-
-	// Handle built-in types
-	switch result.DataType {
-	case "string":
-		return `""`
-	case "int", "int8", "int16", "int32", "int64":
-		return "0"
-	case "uint", "uint8", "uint16", "uint32", "uint64":
-		return "0"
-	case "float32", "float64":
-		return "0"
-	case "bool":
-		return "false"
-	case "byte":
-		return "0"
-	case "rune":
-		return "0"
-	case "complex64", "complex128":
-		return "0"
-	case "error":
-		return "nil"
-	default:
-		// For custom types, try to use the type name in lowercase
-		// This is a fallback for unknown types
-		return lowerFirst(result.DataType)
 	}
 }
