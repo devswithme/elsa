@@ -64,7 +64,18 @@ func parseImports(node *ast.File) map[string]string {
 // findGoModDir searches upward from a starting path to find the directory containing go.mod
 // This is useful for locating the Go module root from any file within the module
 func findGoModDir(start string) (string, error) {
-	dir := filepath.Dir(start)
+	// If start is a file, get its directory
+	dir := start
+	if info, err := os.Stat(start); err == nil && !info.IsDir() {
+		dir = filepath.Dir(start)
+	}
+
+	// Ensure we have an absolute path
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return "", fmt.Errorf("failed to get absolute path for %s: %v", dir, err)
+	}
+	dir = absDir
 
 	for {
 		// Check if go.mod exists in this directory
