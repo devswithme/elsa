@@ -140,7 +140,10 @@ func (g *Generator) generateElsaGenImportSelection(elsaGenFile ElsaGenFile) stri
 	// Convert map to slice for consistent ordering
 	var packages []string
 	for pkg := range elsaGenFile.ImportedPackages {
-		if _, ok := elsaGenFile.StructsData[pkg]; ok || isBuiltinType(pkg) {
+		if pkg == "" || isBuiltinType(pkg) {
+			continue
+		}
+		if _, ok := elsaGenFile.StructsData[pkg]; ok {
 			continue
 		}
 		importedPackage := elsaGenFile.ImportedPackages[pkg]
@@ -179,11 +182,19 @@ func (g *Generator) generateElsaGenStructs(elsaGenFile ElsaGenFile) string {
 		// Generate struct fields with proper alignment
 		for _, structData := range structs {
 			et := extractType(structData.Type)
-			importedPackage := elsaGenFile.ImportedPackages[et.Package].Alias + "." + et.DataType
+
+			var typeName string
+			if et.Package == "" {
+				// Builtin type, use DataType directly
+				typeName = et.DataType
+			} else {
+				// Custom type, use alias + DataType
+				typeName = elsaGenFile.ImportedPackages[et.Package].Alias + "." + et.DataType
+			}
 
 			// Create padding spaces for alignment
 			padding := strings.Repeat(" ", maxNameLength-len(structData.Name))
-			content += fmt.Sprintf("\t%s%s %s\n", structData.Name, padding, importedPackage)
+			content += fmt.Sprintf("\t%s%s %s\n", structData.Name, padding, typeName)
 		}
 		content += "}\n\n"
 	}
@@ -231,18 +242,34 @@ func (g *Generator) generateSingleFunction(name string, function ElsaGenFunction
 func (g *Generator) generateFunctionParams(function ElsaGenFunction, elsaGenFile ElsaGenFile) []string {
 	var params []string
 	for _, param := range function.Params {
-		importedPackage := elsaGenFile.ImportedPackages[param.Package].Alias
-		if param.UsePointer {
-			importedPackage = "*" + importedPackage
-		}
-		if _, ok := elsaGenFile.StructsData[param.Package]; !ok && !isBuiltinType(param.Package) {
-			importedPackage += "." + param.DataType
+		var typeName string
+		var variableName string
+
+		if param.Package == "" {
+			// Builtin type
+			typeName = param.DataType
+			if param.UsePointer {
+				typeName = "*" + typeName
+			}
+			// For builtin types, use the parameter name directly
+			variableName = param.ParamName
+		} else {
+			// Custom type
+			importedPackage := elsaGenFile.ImportedPackages[param.Package].Alias
+			if param.UsePointer {
+				importedPackage = "*" + importedPackage
+			}
+			if _, ok := elsaGenFile.StructsData[param.Package]; !ok {
+				importedPackage += "." + param.DataType
+			}
+			typeName = importedPackage
+
+			// Get variable name from SourcePackages
+			key := param.Package + "." + param.DataType
+			variableName = function.SourcePackages[key].VariableName
 		}
 
-		paramStr := fmt.Sprintf("%s %s",
-			function.SourcePackages[param.Package+"."+param.DataType].VariableName,
-			importedPackage,
-		)
+		paramStr := fmt.Sprintf("%s %s", variableName, typeName)
 		params = append(params, paramStr)
 	}
 	return params
@@ -398,9 +425,33 @@ func (g *Generator) generateStructContent(result TypeInfo, function ElsaGenFunct
 	structContent := ""
 	if structFields, exists := elsaGenFile.StructsData[result.Package]; exists {
 		for _, structData := range structFields {
+			// Check if this is a builtin type
+			et := extractType(structData.Type)
+			var variableName string
+
+			if et.Package == "" {
+				// Builtin type, look for matching parameter in function
+				key := fmt.Sprintf("%s.%s", et.Package, et.DataType) // This will be ".string"
+				if source, exists := function.SourcePackages[key]; exists {
+					variableName = source.VariableName
+				} else {
+					// Fallback to default value
+					variableName = g.getDefaultValueForType(et)
+				}
+			} else {
+				// Custom type, look up in SourcePackages
+				key := fmt.Sprintf("%s.%s", et.Package, et.DataType)
+				if source, exists := function.SourcePackages[key]; exists {
+					variableName = source.VariableName
+				} else {
+					// Fallback to default value
+					variableName = g.getDefaultValueForType(et)
+				}
+			}
+
 			structContent += fmt.Sprintf("\t\t%s: %s,\n",
 				structData.Name,
-				function.SourcePackages[structData.Type].VariableName)
+				variableName)
 		}
 		if structContent != "" {
 			structContent = "{\n" + structContent + "\t}"
