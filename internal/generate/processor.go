@@ -180,7 +180,7 @@ func (g *Generator) generateElsaGenStructs(elsaGenFile ElsaGenFile) string {
 
 		// Generate struct fields with proper alignment
 		for _, structData := range structs {
-			et := extractType(structData.Type)
+			et := extractTypeWithImports(structData.Type, g.imports)
 
 			var typeName string
 			if et.Package == "" {
@@ -345,7 +345,7 @@ func (g *Generator) generateFunctionCall(generated FuncInfo, function ElsaGenFun
 
 	// Generate parameters
 	for _, param := range generated.Params {
-		et := extractType(param.Type)
+		et := extractTypeWithImports(param.Type, g.imports)
 		source := function.SourcePackages[et.Package+"."+et.DataType]
 		paramValue := g.formatParameterValue(source, et)
 		params = append(params, paramValue)
@@ -353,7 +353,7 @@ func (g *Generator) generateFunctionCall(generated FuncInfo, function ElsaGenFun
 
 	// Generate results
 	for _, result := range generated.Results {
-		et := extractType(result.Type)
+		et := extractTypeWithImports(result.Type, g.imports)
 		resultVar := function.SourcePackages[et.Package+"."+et.DataType].VariableName
 		results = append(results, resultVar)
 	}
@@ -447,7 +447,7 @@ func (g *Generator) generateStructContent(result TypeInfo, function ElsaGenFunct
 
 		for _, structData := range structFields {
 			// Check if this is a builtin type
-			et := extractType(structData.Type)
+			et := extractTypeWithImports(structData.Type, g.imports)
 			var variableName string
 			var found bool
 
@@ -609,7 +609,7 @@ func (g *Generator) processFunctionParams(elsaGenFile *ElsaGenFile, fn FuncInfo)
 		existingParams[param.Type] = true
 
 		// Process parameter type
-		typeInfo := extractType(param.Type)
+		typeInfo := extractTypeWithImports(param.Type, g.imports)
 		typeInfo.ParamName = param.Name
 
 		// Update function data
@@ -640,7 +640,7 @@ func (g *Generator) processFunctionResults(elsaGenFile *ElsaGenFile, fn FuncInfo
 	funcSetImportedPackages := g.createImportPackageSetter(elsaGenFile)
 
 	for _, result := range fn.Results {
-		typeInfo := extractType(result.Type)
+		typeInfo := extractTypeWithImports(result.Type, g.imports)
 
 		// Update function data
 		funcData := elsaGenFile.Functions[fn.FuncName]
@@ -657,7 +657,7 @@ func (g *Generator) processFunctionResults(elsaGenFile *ElsaGenFile, fn FuncInfo
 
 				// Register import packages for struct fields
 				for _, structField := range result.StructFields {
-					fieldTypeInfo := extractType(structField.Type)
+					fieldTypeInfo := extractTypeWithImports(structField.Type, g.imports)
 					funcSetImportedPackages(fieldTypeInfo)
 				}
 			}
@@ -716,7 +716,7 @@ func (g *Generator) processGeneratedFunctions(elsaGenFile *ElsaGenFile, fn FuncI
 // Returns true if all parameters are available, false otherwise.
 func (g *Generator) areAllParametersAvailable(elsaGenFile *ElsaGenFile, funcName string, gf FuncInfo) bool {
 	for _, param := range gf.Params {
-		typeInfo := extractType(param.Type)
+		typeInfo := extractTypeWithImports(param.Type, g.imports)
 		key := fmt.Sprintf("%s.%s", typeInfo.Package, typeInfo.DataType)
 		if elsaGenFile.Functions[funcName].SourcePackages[key].VariableName == "" {
 			return false
@@ -732,7 +732,7 @@ func (g *Generator) areAllParametersAvailable(elsaGenFile *ElsaGenFile, funcName
 // This enables the results to be used as parameters for subsequent function calls.
 func (g *Generator) processGeneratedFunctionResults(elsaGenFile *ElsaGenFile, funcName string, gf FuncInfo, funcSetImportedPackages func(TypeInfo)) {
 	for _, result := range gf.Results {
-		typeInfo := extractType(result.Type)
+		typeInfo := extractTypeWithImports(result.Type, g.imports)
 		key := fmt.Sprintf("%s.%s", typeInfo.Package, typeInfo.DataType)
 		elsaGenFile.Functions[funcName].SourcePackages[key] = ElsaSourceDetail{
 			VariableName: lowerFirst(typeInfo.DataType),

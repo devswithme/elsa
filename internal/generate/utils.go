@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"go/types"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"unicode"
@@ -42,23 +43,60 @@ func resolvePath(targetDir string) (string, error) {
 
 // parseImports parses imports from an AST file and returns a map of alias to package path
 // Handles both aliased imports (e.g., healthRepo "github.com/xxx/health") and direct imports
-// For direct imports, it extracts the last segment of the package path as the key
+// For direct imports, it tries to determine the correct alias by checking if any package uses the alias
+// and falls back to the actual package name if available
 func parseImports(node *ast.File) map[string]string {
 	imports := make(map[string]string)
 
+	// First pass: collect all imports
+	var directImports []string
 	for _, imp := range node.Imports {
 		pkgPath := strings.Trim(imp.Path.Value, `"`)
 		if imp.Name != nil {
 			// Aliased import, example: healthRepo "github.com/xxx/health"
 			imports[imp.Name.Name] = pkgPath
 		} else {
-			// Direct import → extract last segment
+			// Direct import - collect for later processing
+			directImports = append(directImports, pkgPath)
+		}
+	}
+
+	// Second pass: process direct imports
+	for _, pkgPath := range directImports {
+		// Try to get the actual package name
+		actualPackageName := getPackageName(pkgPath)
+
+		// Check if the actual package name is already used as an alias
+		if _, exists := imports[actualPackageName]; !exists {
+			imports[actualPackageName] = pkgPath
+		} else {
+			// If actual package name is already used, fall back to last segment
 			parts := strings.Split(pkgPath, "/")
-			imports[parts[len(parts)-1]] = pkgPath
+			fallback := parts[len(parts)-1]
+			imports[fallback] = pkgPath
 		}
 	}
 
 	return imports
+}
+
+// getPackageName attempts to get the actual package name from a package path
+// It tries to use 'go list' command to get the package name, and falls back to
+// the last segment of the path if the command fails
+func getPackageName(pkgPath string) string {
+	// Try to get package name using go list command
+	cmd := exec.Command("go", "list", "-f", "{{.Name}}", pkgPath)
+	output, err := cmd.Output()
+	if err == nil {
+		name := strings.TrimSpace(string(output))
+		if name != "" && name != "main" {
+			return name
+		}
+	}
+
+	// Fallback: use last segment of the path
+	parts := strings.Split(pkgPath, "/")
+	return parts[len(parts)-1]
 }
 
 // findGoModDir searches upward from a starting path to find the directory containing go.mod
@@ -143,6 +181,10 @@ type TypeInfo struct {
 }
 
 func extractType(input string) TypeInfo {
+	return extractTypeWithImports(input, nil)
+}
+
+func extractTypeWithImports(input string, imports map[string]string) TypeInfo {
 	ti := TypeInfo{}
 
 	// cek prefix *
@@ -169,7 +211,15 @@ func extractType(input string) TypeInfo {
 		ti.DataType = input
 	}
 
-	// alias = segment terakhir dari package path
+	// Try to find alias from imports map first
+	for alias, pkgPath := range imports {
+		if pkgPath == ti.Package {
+			ti.Alias = alias
+			return ti
+		}
+	}
+
+	// Fallback: alias = segment terakhir dari package path
 	alias := ti.Package
 	if idx := strings.LastIndex(alias, "/"); idx != -1 {
 		alias = alias[idx+1:]
