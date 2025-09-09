@@ -61,7 +61,7 @@ Flags:
 	NewSuccessUsingCache     = "📦 Using cached template \"%s\""
 
 	// Info messages
-	NewInfoCloningTemplate = "🔄 Cloning template \"%s\"..."
+	NewInfoCloningTemplate = "⬇️ Cloning template \"%s\"..."
 	NewInfoUpdatingModule  = "🚀 Setting module name to \"%s\"..."
 	NewInfoRefreshingCache = "🔄 Refreshing template cache..."
 	NewInfoCacheExpired    = "⏰ Template cache expired, refreshing..."
