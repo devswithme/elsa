@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/risoftinc/elsa/constants"
 )
 
 type (
@@ -79,7 +81,7 @@ func (g *Generator) GenerateElsaGenFile(target string, elsaGenFile ElsaGenFile) 
 		return fmt.Errorf("failed to write elsa_gen.go: %v", err)
 	}
 
-	fmt.Printf("Generated: %s from %s\n", outputPath, elsaGenFile.Target)
+	fmt.Printf("%s Generated: %s from %s\n", constants.SuccessEmoji, outputPath, elsaGenFile.Target)
 	return nil
 }
 
