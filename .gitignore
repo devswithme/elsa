@@ -35,6 +35,8 @@ Thumbs.db
 
 # Build artifacts
 /build/
+/docs/
+/my-project/
 /elsa/
 elsa-*
 coverage.out
