@@ -47,9 +47,8 @@
 - **Template Caching**: Smart caching system with 6-hour TTL
 - **Cross-Platform Cache**: Platform-specific cache locations (Windows/macOS/Linux)
 - **Version Support**: Support for specific tags, branches, and latest versions
-- **Module Management**: Automatic go.mod module name replacement
-- **Import Replacement**: Automatic import statement updates
-- **Git Cleanup**: Remove git history for fresh project start
+- **Module Management**: Automatic go.mod module name creation
+- **Import Management**: Automatic import statement updates
 
 ## 📦 Installation
 
