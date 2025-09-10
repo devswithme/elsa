@@ -59,12 +59,12 @@ Flags:
 	// Success messages
 	NewSuccessProjectCreated = "✅ Project \"%s\" created successfully!"
 	NewSuccessTemplateCached = "📦 Template \"%s\" cached successfully"
-	NewSuccessUsingCache     = "📦 Using cached template \"%s\""
+	NewSuccessUsingCache     = "⚡ Using cached template \"%s\""
 
 	// Info messages
 	NewInfoCloningTemplate = "⬇️ Cloning template \"%s\"..."
 	NewInfoUpdatingModule  = "🚀 Setting module name to \"%s\"..."
-	NewInfoGeneratingProto = "🔧 Generating Go files from .proto files..."
+	NewInfoGeneratingProto = "🛠️ Generating Go files from .proto files..."
 	NewInfoProtocNotFound  = "⚠️ protoc not found, skipping proto generation (install protoc to generate Go files from .proto)"
 	NewInfoRefreshingCache = "🔄 Refreshing template cache..."
 	NewInfoCacheExpired    = "⏰ Template cache expired, refreshing..."
