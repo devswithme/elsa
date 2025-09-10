@@ -48,7 +48,6 @@
 - **Cross-Platform Cache**: Platform-specific cache locations (Windows/macOS/Linux)
 - **Version Support**: Support for specific tags, branches, and latest versions
 - **Module Management**: Automatic go.mod module name creation
-- **Import Management**: Automatic import statement updates
 
 ## 📦 Installation
 
