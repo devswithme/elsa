@@ -1,7 +1,9 @@
 package new
 
 import (
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -122,7 +124,7 @@ func (tm *TemplateManager) updateImports(projectPath, originalModule, newModule 
 		}
 
 		// Skip directories and non-Go files
-		if info.IsDir() || !strings.HasSuffix(path, ".go") {
+		if info.IsDir() || (!strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, ".proto")) {
 			return nil
 		}
 
@@ -180,4 +182,74 @@ func (tm *TemplateManager) replaceImportLine(line, originalModule, newModule str
 	// Simple string replacement for the original module name
 	updatedLine := strings.Replace(line, originalModule, newModule, -1)
 	return updatedLine
+}
+
+// hasProtoFiles checks if the project contains .proto files
+func (tm *TemplateManager) hasProtoFiles(projectPath string) bool {
+	hasProto := false
+	filepath.Walk(projectPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() && strings.HasSuffix(path, ".proto") {
+			hasProto = true
+			return filepath.SkipDir // Stop walking once we find a proto file
+		}
+		return nil
+	})
+	return hasProto
+}
+
+// isProtocInstalled checks if protoc is installed and available
+func (tm *TemplateManager) isProtocInstalled() bool {
+	cmd := exec.Command("protoc", "--version")
+	err := cmd.Run()
+	return err == nil
+}
+
+// generateProtoFiles runs protoc to generate Go files from .proto files
+func (tm *TemplateManager) generateProtoFiles(projectPath string) error {
+	// Find all .proto files
+	var protoFiles []string
+	err := filepath.Walk(projectPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() && strings.HasSuffix(path, ".proto") {
+			protoFiles = append(protoFiles, path)
+		}
+		return nil
+	})
+
+	if err != nil {
+		return err
+	}
+
+	if len(protoFiles) == 0 {
+		return nil // No proto files found
+	}
+
+	// Run protoc for each .proto file
+	for _, protoFile := range protoFiles {
+		// Get the directory containing the proto file
+		protoDir := filepath.Dir(protoFile)
+		protoFileName := filepath.Base(protoFile)
+
+		// Run protoc command
+		cmd := exec.Command("protoc",
+			"--go_out=.",
+			"--go_opt=paths=source_relative",
+			"--go-grpc_out=.",
+			"--go-grpc_opt=paths=source_relative",
+			protoFileName)
+		cmd.Dir = protoDir
+
+		// Capture output for better error reporting
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("failed to generate proto files for %s: %v\nOutput: %s", protoFileName, err, string(output))
+		}
+	}
+
+	return nil
 }

@@ -127,6 +127,18 @@ func (tm *TemplateManager) createProject(templateName, version, projectPath, mod
 		}
 	}
 
+	// Generate proto files if .proto files are found
+	if tm.hasProtoFiles(projectPath) {
+		if tm.isProtocInstalled() {
+			fmt.Printf(constants.NewInfoGeneratingProto + "\n")
+			if err := tm.generateProtoFiles(projectPath); err != nil {
+				return fmt.Errorf(constants.NewErrorProtoGeneration, err)
+			}
+		} else {
+			fmt.Printf(constants.NewInfoProtocNotFound + "\n")
+		}
+	}
+
 	// Clean git history
 	if err := tm.cleanGitHistory(projectPath); err != nil {
 		return fmt.Errorf(constants.NewErrorCleanupFailed, err)

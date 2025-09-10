@@ -54,6 +54,7 @@ Flags:
 	NewErrorUpdateModuleFailed = "failed to update go.mod: %v"
 	NewErrorCleanupFailed      = "failed to cleanup git: %v"
 	NewErrorInvalidModuleName  = "invalid module name: %v"
+	NewErrorProtoGeneration    = "failed to generate proto files: %v"
 
 	// Success messages
 	NewSuccessProjectCreated = "✅ Project \"%s\" created successfully!"
@@ -63,6 +64,8 @@ Flags:
 	// Info messages
 	NewInfoCloningTemplate = "⬇️ Cloning template \"%s\"..."
 	NewInfoUpdatingModule  = "🚀 Setting module name to \"%s\"..."
+	NewInfoGeneratingProto = "🔧 Generating Go files from .proto files..."
+	NewInfoProtocNotFound  = "⚠️ protoc not found, skipping proto generation (install protoc to generate Go files from .proto)"
 	NewInfoRefreshingCache = "🔄 Refreshing template cache..."
 	NewInfoCacheExpired    = "⏰ Template cache expired, refreshing..."
 	NewInfoAutoModule      = "🔧 Auto-generating module name: \"%s\""
