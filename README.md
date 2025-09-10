@@ -362,7 +362,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🔗 Links
 
-- **Website**: [https://risoftinc.com](https://risoftinc.com)
+- **Get to Know**: [https://risoftinc.com](https://risoftinc.com)
 - **GitHub**: [https://github.com/risoftinc/elsa](https://github.com/risoftinc/elsa)
 - **Issues**: [https://github.com/risoftinc/elsa/issues](https://github.com/risoftinc/elsa/issues)
 
