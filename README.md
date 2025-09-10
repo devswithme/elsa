@@ -111,6 +111,16 @@ elsa new xarch@v1.2.3 my-api --module "github.com/username/my-api"
 elsa new xarch my-api --module "github.com/username/my-api" --output "./projects"
 ```
 
+**About xarch:**
+[xarch](https://github.com/risoftinc/xarch) is a Go project template that provides a clean architecture structure with:
+- Domain-driven design (DDD) pattern
+- Repository and service layers
+- HTTP handlers and middleware
+- Database integration with GORM
+- Dependency injection setup
+- Health check endpoints
+- Configuration management
+
 ### 5. Custom Commands
 ```bash
 # List available commands from Elsafile
