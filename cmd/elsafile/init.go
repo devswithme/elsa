@@ -12,7 +12,7 @@ var InitCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize a new Elsafile in the current directory",
 	Long: `Initialize creates a new Elsafile in the current directory.
-The Elsafile is similar to a Makefile and allows you to define custom commands
+The Elsafile allows you to define custom commands
 for your project. Commands defined in Elsafile can be run using 'elsa run command'.
 
 Example Elsafile content:

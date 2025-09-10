@@ -37,7 +37,7 @@
 - **Restart Delays**: Configurable delays to prevent rapid restarts
 
 ### 📝 Elsafile - Custom Commands
-- **Makefile-like Syntax**: Define custom commands for your project
+- **Custom Command Syntax**: Define custom commands for your project
 - **Command Management**: List, run, and manage custom commands
 - **Conflict Detection**: Identify conflicts with built-in commands
 - **Project Automation**: Streamline your development workflow
