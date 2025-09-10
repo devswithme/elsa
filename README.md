@@ -67,7 +67,7 @@ elsa --version
 
 ## 🏃‍♂️ Quick Start
 
-### 1. Initialize New Project
+### 1. Initialize New Command
 ```bash
 # Create new Elsafile for custom commands
 elsa init
