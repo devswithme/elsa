@@ -135,10 +135,14 @@ elsa run test
 | `elsa migration connect` | Connect to database interactively |
 | `elsa migration create ddl <name>` | Create DDL migration |
 | `elsa migration create dml <name>` | Create DML migration |
-| `elsa migration up <type>` | Apply migrations |
-| `elsa migration down <type>` | Rollback last migration |
+| `elsa migration up <type>` | Apply migrations (type: `ddl` or `dml`) |
+| `elsa migration down <type>` | Rollback last migration (type: `ddl` or `dml`) |
 | `elsa migration status` | Show migration status |
-| `elsa migration refresh <type>` | Refresh all migrations |
+| `elsa migration refresh <type>` | Refresh all migrations (type: `ddl` or `dml`) |
+
+**Migration Types:**
+- `ddl`: Data Definition Language (schema changes, table creation, modifications)
+- `dml`: Data Manipulation Language (data seeding, updates, transformations)
 
 ### Watch Commands
 | Command | Description |
