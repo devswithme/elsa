@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/risoftinc/elsa/constants"
+	"go.risoftinc.com/elsa/constants"
 )
 
 // Utils provides utility functions for Elsafile operations

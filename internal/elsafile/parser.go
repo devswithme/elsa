@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/risoftinc/elsa/constants"
+	"go.risoftinc.com/elsa/constants"
 )
 
 // Parser handles parsing of Elsafile content

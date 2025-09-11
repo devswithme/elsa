@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/risoftinc/elsa/constants"
+	"go.risoftinc.com/elsa/constants"
 )
 
 // Formatter handles formatting of output messages

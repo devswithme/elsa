@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/risoftinc/elsa/internal/elsafile"
 	"github.com/spf13/cobra"
+	"go.risoftinc.com/elsa/internal/elsafile"
 )
 
 var ListCmd = &cobra.Command{

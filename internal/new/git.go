@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/risoftinc/elsa/constants"
+	"go.risoftinc.com/elsa/constants"
 )
 
 // cloneTemplate clones the template repository

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/risoftinc/elsa/internal/generate"
 	"github.com/spf13/cobra"
+	"go.risoftinc.com/elsa/internal/generate"
 )
 
 var GenerateCmd = &cobra.Command{

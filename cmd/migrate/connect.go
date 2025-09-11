@@ -6,9 +6,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/risoftinc/elsa/constants"
-	"github.com/risoftinc/elsa/internal/database"
 	"github.com/spf13/cobra"
+	"go.risoftinc.com/elsa/constants"
+	"go.risoftinc.com/elsa/internal/database"
 )
 
 var (

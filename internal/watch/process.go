@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/risoftinc/elsa/constants"
+	"go.risoftinc.com/elsa/constants"
 )
 
 // ProcessManager handles starting, stopping, and monitoring processes

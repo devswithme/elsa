@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/risoftinc/elsa/cmd"
+	"go.risoftinc.com/elsa/cmd"
 )
 
 var (
-	version = "0.7.4"
+	version = "0.8.1"
 )
 
 func main() {
