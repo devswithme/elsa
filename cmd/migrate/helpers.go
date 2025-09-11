@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/risoftinc/elsa/constants"
-	"github.com/risoftinc/elsa/internal/database"
+	"go.risoftinc.com/elsa/constants"
+	"go.risoftinc.com/elsa/internal/database"
 )
 
 // getAppliedMigrationsWithConnection retrieves applied migrations using connection string

@@ -4,7 +4,7 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/risoftinc/elsa/constants"
+	"go.risoftinc.com/elsa/constants"
 )
 
 // ShellExecutor handles shell command execution with cross-platform support

@@ -1,4 +1,4 @@
-module github.com/risoftinc/elsa
+module go.risoftinc.com/elsa
 
 go 1.21.0
 

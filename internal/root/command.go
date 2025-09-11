@@ -1,8 +1,8 @@
 package root
 
 import (
-	"github.com/risoftinc/elsa/cmd/elsafile"
 	"github.com/spf13/cobra"
+	"go.risoftinc.com/elsa/cmd/elsafile"
 )
 
 // CommandHandler handles root command logic and subcommand management

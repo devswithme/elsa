@@ -7,8 +7,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/risoftinc/elsa/constants"
 	"github.com/spf13/cobra"
+	"go.risoftinc.com/elsa/constants"
 )
 
 // Command represents a command defined in the Elsafile

@@ -1,7 +1,7 @@
 package elsafile
 
 import (
-	"github.com/risoftinc/elsa/internal/elsafile"
+	"go.risoftinc.com/elsa/internal/elsafile"
 )
 
 // SimpleHandler handles unknown commands by checking Elsafile

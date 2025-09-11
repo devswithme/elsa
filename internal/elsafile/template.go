@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/risoftinc/elsa/constants"
+	"go.risoftinc.com/elsa/constants"
 )
 
 // TemplateGenerator handles creation of default Elsafile templates

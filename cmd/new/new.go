@@ -1,9 +1,9 @@
 package new
 
 import (
-	"github.com/risoftinc/elsa/constants"
-	"github.com/risoftinc/elsa/internal/new"
 	"github.com/spf13/cobra"
+	"go.risoftinc.com/elsa/constants"
+	"go.risoftinc.com/elsa/internal/new"
 )
 
 var (

@@ -9,9 +9,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/risoftinc/elsa/constants"
-	internalWatch "github.com/risoftinc/elsa/internal/watch"
 	"github.com/spf13/cobra"
+	"go.risoftinc.com/elsa/constants"
+	internalWatch "go.risoftinc.com/elsa/internal/watch"
 )
 
 var (

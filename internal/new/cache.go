@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/risoftinc/elsa/constants"
+	"go.risoftinc.com/elsa/constants"
 )
 
 // getCacheDir returns the appropriate cache directory for the current platform

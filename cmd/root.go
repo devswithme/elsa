@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/risoftinc/elsa/cmd/elsafile"
-	"github.com/risoftinc/elsa/cmd/generate"
-	"github.com/risoftinc/elsa/cmd/migrate"
-	"github.com/risoftinc/elsa/cmd/new"
-	"github.com/risoftinc/elsa/cmd/watch"
-	"github.com/risoftinc/elsa/constants"
-	"github.com/risoftinc/elsa/internal/root"
 	"github.com/spf13/cobra"
+	"go.risoftinc.com/elsa/cmd/elsafile"
+	"go.risoftinc.com/elsa/cmd/generate"
+	"go.risoftinc.com/elsa/cmd/migrate"
+	"go.risoftinc.com/elsa/cmd/new"
+	"go.risoftinc.com/elsa/cmd/watch"
+	"go.risoftinc.com/elsa/constants"
+	"go.risoftinc.com/elsa/internal/root"
 )
 
 var (

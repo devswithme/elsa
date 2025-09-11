@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/risoftinc/elsa/constants"
 	"github.com/spf13/cobra"
+	"go.risoftinc.com/elsa/constants"
 )
 
 var (

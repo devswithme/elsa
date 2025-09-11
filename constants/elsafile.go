@@ -99,7 +99,7 @@ const (
 
 	DefaultInstallToolsElsaCommand = `# Install elsa cli
 install-tools:
-	go install github.com/risoftinc/elsa/cmd/elsa@latest`
+	go install go.risoftinc.com/elsa/cmd/elsa@latest`
 
 	// DefaultBuildCommand is the default build command template
 	DefaultBuildCommand = `# Build the project
