@@ -64,9 +64,13 @@ func (h *SimpleHandler) HandleUnknownCommand(commandName string) error {
 	fmt.Printf("🚀 Running Elsafile command: %s\n", commandName)
 	fmt.Printf("📝 Executing: %s\n\n", strings.Join(command.Commands, " && "))
 
-	// Join all commands with && to execute them sequentially
-	fullCommand := strings.Join(command.Commands, " && ")
-	return h.elsafileManager.ExecuteShellCommand(fullCommand)
+	// Execute each command sequentially
+	for _, cmd := range command.Commands {
+		if err := h.elsafileManager.ExecuteShellCommand(cmd); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // SuggestCommands suggests similar commands from Elsafile

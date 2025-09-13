@@ -170,6 +170,46 @@ elsa run test
 | `elsa list --conflicts` | Show conflicting commands |
 | `elsa run <command>` | Execute custom command |
 
+#### Advanced Elsafile Features
+
+**Variable Substitution**
+- Environment variables: `$VAR`, `${VAR}`
+- Interactive input: `${?VAR:prompt}`, `${?VAR}`
+- Quote handling: Supports both single and double quotes
+- Line continuation: Use `\` for multi-line commands
+
+**Example Elsafile with Advanced Features:**
+```bash
+# Environment variables (these variables exist in the environment)
+test-env:
+	echo "User: $USER"
+	echo "Path: ${PATH}"
+
+# Interactive input
+# PRIORITY: Check OS environment first, if exists use environment value (NO prompt)
+# If not in environment, then prompt user for manual input
+migration-create:
+	elsa migration create ddl ${?MIGRATION_NAME:Enter migration name}
+
+# Multi-line commands with backslash continuation
+complex-setup:
+	echo "Setting up project: ${?PROJECT_NAME:Enter project name}" && \
+	mkdir ${?PROJECT_NAME} && \
+	cd ${?PROJECT_NAME} && \
+	echo "Description: ${?DESCRIPTION:Enter description}"
+
+# Mixed variables
+test-mixed:
+	echo "User: $USER"  # Environment variable
+	echo "Migration: ${?MIGRATION_NAME:Enter migration name}"  
+	echo "Custom: ${?CUSTOM_VAR:Enter custom value}"  
+```
+
+**Variable Substitution Priority:**
+1. **Environment variables** (if already set)
+2. **Interactive input** (if not in environment)
+3. **Command arguments** (planned for future release)
+
 ### Generate Commands
 | Command | Description |
 |---------|-------------|
@@ -253,6 +293,18 @@ func InitializeHandler(db *gorm.DB) *Dependencies {
 | `--output, -o` | Output directory (default: current) |
 | `--force, -f` | Overwrite existing directory |
 | `--refresh` | Force refresh template cache |
+
+#### Project Creation Process
+The `elsa new` command follows this optimized workflow:
+1. **Clone/Update Template**: Download or refresh template from cache
+2. **Copy Template**: Copy template files to project directory
+3. **Update Module Name**: Replace module name in go.mod and all imports
+4. **Generate Proto Files**: Generate Go files from .proto files (if present)
+5. **Download Dependencies**: Run `go mod download` to fetch all dependencies
+6. **Tidy Dependencies**: Run `go mod tidy` to clean and optimize dependencies
+7. **Clean Git History**: Remove template git history for fresh start
+
+This ensures your new project is ready to run immediately with all dependencies properly resolved.
 
 ## 🔧 Configuration
 
