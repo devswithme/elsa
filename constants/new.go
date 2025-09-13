@@ -55,6 +55,8 @@ Flags:
 	NewErrorCleanupFailed      = "failed to cleanup git: %v"
 	NewErrorInvalidModuleName  = "invalid module name: %v"
 	NewErrorProtoGeneration    = "failed to generate proto files: %v"
+	NewErrorGoModDownload      = "failed to download Go modules: %v"
+	NewErrorGoModTidy          = "failed to tidy Go modules: %v"
 
 	// Success messages
 	NewSuccessProjectCreated = "✅ Project \"%s\" created successfully!"
@@ -69,6 +71,8 @@ Flags:
 	NewInfoRefreshingCache = "🔄 Refreshing template cache..."
 	NewInfoCacheExpired    = "⏰ Template cache expired, refreshing..."
 	NewInfoAutoModule      = "🔧 Auto-generating module name: \"%s\""
+	NewInfoGoModDownload   = "📥 Downloading Go modules..."
+	NewInfoGoModTidy       = "🧹 Tidying Go modules..."
 
 	// Cache settings
 	NewCacheTTLHours = 6

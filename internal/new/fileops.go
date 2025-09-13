@@ -253,3 +253,45 @@ func (tm *TemplateManager) generateProtoFiles(projectPath string) error {
 
 	return nil
 }
+
+// runGoModDownload runs 'go mod download' in the project directory
+func (tm *TemplateManager) runGoModDownload(projectPath string) error {
+	// Check if go.mod exists
+	goModPath := filepath.Join(projectPath, "go.mod")
+	if _, err := os.Stat(goModPath); os.IsNotExist(err) {
+		return nil // No go.mod file, skip download
+	}
+
+	// Run go mod download
+	cmd := exec.Command("go", "mod", "download")
+	cmd.Dir = projectPath
+
+	// Capture output for better error reporting
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("go mod download failed: %v\nOutput: %s", err, string(output))
+	}
+
+	return nil
+}
+
+// runGoModTidy runs 'go mod tidy' in the project directory
+func (tm *TemplateManager) runGoModTidy(projectPath string) error {
+	// Check if go.mod exists
+	goModPath := filepath.Join(projectPath, "go.mod")
+	if _, err := os.Stat(goModPath); os.IsNotExist(err) {
+		return nil // No go.mod file, skip tidy
+	}
+
+	// Run go mod tidy
+	cmd := exec.Command("go", "mod", "tidy")
+	cmd.Dir = projectPath
+
+	// Capture output for better error reporting
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("go mod tidy failed: %v\nOutput: %s", err, string(output))
+	}
+
+	return nil
+}
