@@ -54,19 +54,22 @@ func (p *Parser) parseFileContent(file *os.File) (map[string]*Command, error) {
 func (p *Parser) parseLines(lines []string) (map[string]*Command, error) {
 	commands := make(map[string]*Command)
 	var currentCommand *Command
+	var currentLine strings.Builder
 
 	for _, line := range lines {
-		line = strings.TrimSpace(line)
+		line = strings.TrimRight(line, " \t") // Trim only trailing spaces/tabs
 
 		// Skip empty lines and comments
-		if line == "" || strings.HasPrefix(line, constants.CommentPrefix) {
+		if line == "" || strings.HasPrefix(strings.TrimSpace(line), constants.CommentPrefix) {
 			continue
 		}
 
 		// Check if this is a command definition (ends with :)
 		if strings.HasSuffix(line, constants.CommandSuffix) {
 			// Save previous command if exists
-			if currentCommand != nil && len(currentCommand.Commands) > 0 {
+			if currentCommand != nil && currentLine.Len() > 0 {
+				parsedCommands := parseCommandLine(currentLine.String())
+				currentCommand.Commands = append(currentCommand.Commands, parsedCommands...)
 				commands[currentCommand.Name] = currentCommand
 			}
 
@@ -76,14 +79,37 @@ func (p *Parser) parseLines(lines []string) (map[string]*Command, error) {
 				Name:     commandName,
 				Commands: []string{},
 			}
+			currentLine.Reset()
 		} else if currentCommand != nil {
-			// Add line to current command
-			currentCommand.Commands = append(currentCommand.Commands, line)
+			// Check for line continuation with backslash
+			if strings.HasSuffix(line, "\\") {
+				// Remove the backslash and add to current line
+				lineWithoutBackslash := strings.TrimSuffix(line, "\\")
+				if currentLine.Len() > 0 {
+					currentLine.WriteString(" ")
+				}
+				currentLine.WriteString(strings.TrimSpace(lineWithoutBackslash))
+			} else {
+				// Complete line, add to current line and process
+				if currentLine.Len() > 0 {
+					currentLine.WriteString(" ")
+				}
+				currentLine.WriteString(strings.TrimSpace(line))
+
+				// Parse and add the complete command
+				parsedCommands := parseCommandLine(currentLine.String())
+				currentCommand.Commands = append(currentCommand.Commands, parsedCommands...)
+				currentLine.Reset()
+			}
 		}
 	}
 
-	// Save last command
-	if currentCommand != nil && len(currentCommand.Commands) > 0 {
+	// Save last command if there's remaining content
+	if currentCommand != nil && currentLine.Len() > 0 {
+		parsedCommands := parseCommandLine(currentLine.String())
+		currentCommand.Commands = append(currentCommand.Commands, parsedCommands...)
+		commands[currentCommand.Name] = currentCommand
+	} else if currentCommand != nil && len(currentCommand.Commands) > 0 {
 		commands[currentCommand.Name] = currentCommand
 	}
 
