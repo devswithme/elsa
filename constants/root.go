@@ -24,7 +24,7 @@ Available Commands:`
 	SuggestionText = "💡 Did you mean one of these commands?"
 
 	// Version template
-	VersionTemplate = "ELSA v%s (CLI)\ngo version %s %s\nLearn more at: https://risoftinc.com\n"
+	VersionTemplate = "ELSA v%s (CLI)\ngo version %s %s\nLearn more at: https://go.risoftinc.com/elsa\n"
 
 	// Banner template
 	BannerTemplate = `Developer productivity toolkit for Go.

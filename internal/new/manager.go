@@ -139,6 +139,18 @@ func (tm *TemplateManager) createProject(templateName, version, projectPath, mod
 		}
 	}
 
+	// Download Go modules
+	fmt.Printf(constants.NewInfoGoModDownload + "\n")
+	if err := tm.runGoModDownload(projectPath); err != nil {
+		return fmt.Errorf(constants.NewErrorGoModDownload, err)
+	}
+
+	// Tidy Go modules
+	fmt.Printf(constants.NewInfoGoModTidy + "\n")
+	if err := tm.runGoModTidy(projectPath); err != nil {
+		return fmt.Errorf(constants.NewErrorGoModTidy, err)
+	}
+
 	// Clean git history
 	if err := tm.cleanGitHistory(projectPath); err != nil {
 		return fmt.Errorf(constants.NewErrorCleanupFailed, err)
