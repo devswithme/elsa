@@ -208,7 +208,6 @@ test-mixed:
 **Variable Substitution Priority:**
 1. **Environment variables** (if already set)
 2. **Interactive input** (if not in environment)
-3. **Command arguments** (planned for future release)
 
 ### Generate Commands
 | Command | Description |
