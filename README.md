@@ -331,6 +331,7 @@ This ensures your new project is ready to run immediately with all dependencies 
 | Command | Description |
 |---------|-------------|
 | `elsa make <template-type> <name>` | Generate file from template |
+| `elsa make <template-type> <name> --refresh` | Generate file from template with fresh templates |
 | `elsa make list` | List available template types |
 | `elsa make --help` | Show make command help |
 
@@ -351,9 +352,15 @@ elsa make service user_service
 # Generate with folder structure
 elsa make repository health/health_repository
 
+# Force refresh templates from remote repository
+elsa make repository user_repository --refresh
+
 # List available template types
 elsa make list
 ```
+
+#### Flags
+- `--refresh`: Force refresh templates from remote repository, bypassing local cache
 
 #### Configuration
 The make system uses `.elsa-config.yaml` in your project root:
