@@ -19,9 +19,9 @@ Complete guide for using and developing the `elsa make` system - a dynamic and f
 
 - **Dynamic template types** - add new template types without code modification
 - **Folder structure support** - generate files in desired directory structures
-- **Template versioning** - support multiple template versions
+- **Git-based versioning** - support multiple template versions via git commit hashes
 - **Custom template override** - override templates per project
-- **Cache management** - templates are cached for optimal performance
+- **Git-based caching** - templates are cached using git URL structure for better organization
 - **File replacement safety** - confirmation prompt before overwriting existing files
 - **Smart package detection** - automatically detects existing package names in target directories
 - **Interactive output dialog** - prompts for output directory when not configured
@@ -110,8 +110,6 @@ func New{{.StructName | title}}Repositories() I{{.StructName | title}}Repositori
 ```yaml
 # Source template information (auto-generated)
 source:
-  name: xarch                    # Template name
-  version: v1.2.3               # Template version
   git_url: https://github.com/risoftinc/xarch
   git_commit: abc123def456      # Git commit hash
 
@@ -149,8 +147,8 @@ The system resolves template files using the following priority order:
    - Example: `./.stub/repository/template.go.tmpl`
 
 2. **Cache templates** (downloaded from template repository)
-   - Path: `~/.elsa/cache/templates/{template_name}/{version}/.stub/{template_type}/{template_file}`
-   - Example: `~/.elsa/cache/templates/xarch/v1.2.3/.stub/repository/template.go.tmpl`
+   - Path: `~/.elsa-cache/filestub/{git_url_path}/{commit_hash}/.stub/{template_type}/{template_file}`
+   - Example: `~/.elsa-cache/filestub/github.com/risoftinc/xarch/abc123def456/.stub/repository/template.go.tmpl`
 
 3. **Fallback** (local .stub for development)
 
@@ -382,7 +380,7 @@ When you run `elsa make repository user_repository`, the system:
    - Extracts file: `template.go.tmpl`
 4. **Searches for template** in priority order:
    - `./.stub/repository/template.go.tmpl` (local)
-   - `~/.elsa/cache/templates/xarch/v1.2.3/.stub/repository/template.go.tmpl` (cache)
+   - `~/.elsa-cache/filestub/github.com/risoftinc/xarch/abc123def456/.stub/repository/template.go.tmpl` (cache)
 5. **Loads template** and generates file at `domain/repositories/user_repository.go`
 
 ### 2. Folder Structure Support
@@ -424,15 +422,20 @@ $ elsa make repository user_repository
 
 ### 4. Template Versioning
 
-Template versioning is supported through git tags/branches:
+Template versioning is supported through git commit hashes:
 
 ```bash
-# Use specific version
-elsa new myproject xarch@v1.2.3
+# Use specific commit
+elsa new myproject xarch@abc123def456
 
 # Use latest
 elsa new myproject xarch@latest
 ```
+
+**Cache Structure:**
+- Templates are cached using git URL and commit hash
+- Cache path: `~/.elsa-cache/filestub/{git_url_path}/{commit_hash}/.stub/`
+- Example: `~/.elsa-cache/filestub/github.com/risoftinc/xarch/abc123def456/.stub/`
 
 ## Best Practices
 
@@ -532,7 +535,7 @@ If there are cache issues:
 
 ```bash
 # Clear cache
-rm -rf ~/.elsa/cache
+rm -rf ~/.elsa-cache
 
 # Force refresh template
 elsa new myproject xarch --refresh

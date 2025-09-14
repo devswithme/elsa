@@ -44,9 +44,9 @@
 
 ### 🔧 Code Generation & Scaffolding
 - **Project Templates**: Generate boilerplate code and project structures
-- **Template Caching**: Smart caching system with 6-hour TTL
+- **Template Caching**: Smart caching system with git-based cache paths
 - **Cross-Platform Cache**: Platform-specific cache locations (Windows/macOS/Linux)
-- **Version Support**: Support for specific tags, branches, and latest versions
+- **Git-Based Caching**: Cache paths follow git URL structure for better organization
 - **Module Management**: Automatic go.mod module name creation
 
 ### 🏗️ Make System
@@ -366,8 +366,6 @@ elsa make list
 The make system uses `.elsa-config.yaml` in your project root:
 ```yaml
 source:
-  name: xarch
-  version: v1.2.3
   git_url: https://github.com/risoftinc/xarch
   git_commit: abc123def456
 

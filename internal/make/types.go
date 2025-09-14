@@ -14,8 +14,6 @@ type ProjectConfig struct {
 
 // SourceInfo contains source template information
 type SourceInfo struct {
-	Name      string `yaml:"name"`
-	Version   string `yaml:"version"`
 	GitURL    string `yaml:"git_url"`
 	GitCommit string `yaml:"git_commit"`
 }
@@ -120,14 +118,14 @@ func (tm *TemplateManager) extractFolderAndFile(name string) (string, string) {
 		parts := strings.Split(name, "/")
 		if len(parts) == 2 {
 			// Convert folder and file to snake_case
-			folder := tm.toSnakeCase(parts[0])
-			file := tm.toSnakeCase(parts[1])
+			folder := toSnakeCase(parts[0])
+			file := toSnakeCase(parts[1])
 			return folder, file
 		}
 	}
 
 	// Convert to snake_case
-	return "", tm.toSnakeCase(name)
+	return "", toSnakeCase(name)
 }
 
 // extractPackageName extracts package name from file name or existing Go files
@@ -184,23 +182,4 @@ func (tm *TemplateManager) extractStructName(fileName string) string {
 		return ""
 	}
 	return strings.ToUpper(string(first[0])) + strings.ToLower(first[1:])
-}
-
-// toSnakeCase converts PascalCase to snake_case
-func (tm *TemplateManager) toSnakeCase(s string) string {
-	// Convert PascalCase to snake_case
-	var result []rune
-	for i, r := range s {
-		if i > 0 && r >= 'A' && r <= 'Z' {
-			result = append(result, '_')
-		}
-		result = append(result, r)
-	}
-	return strings.ToLower(string(result))
-}
-
-// getCacheDir returns the cache directory path
-func getCacheDir() string {
-	homeDir, _ := os.UserHomeDir()
-	return filepath.Join(homeDir, ".elsa-cache", "templates")
 }

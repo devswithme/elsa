@@ -1,42 +1,41 @@
 package make
 
 import (
-	"fmt"
-	"os"
-
+	"github.com/spf13/cobra"
 	"go.risoftinc.com/elsa/internal/make"
 )
 
-func main() {
-	if len(os.Args) < 2 {
-		fmt.Println("Usage: elsa make <template-type> <name>")
-		fmt.Println("Example: elsa make repository user_repository")
-		os.Exit(1)
-	}
+// MakeCmd represents the make command
+var MakeCmd = &cobra.Command{
+	Use:   "make <template-type> <name>",
+	Short: "Generate files from templates",
+	Long: `Generate files from templates using the configured template types.
 
-	command := make.NewMakeCommand()
+Examples:
+  elsa make repository user_repository
+  elsa make service user_service
+  elsa make repository health/health_repository
+  elsa make repository user_repository --refresh`,
+	Args: cobra.MinimumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		refresh, _ := cmd.Flags().GetBool("refresh")
+		command := make.NewMakeCommand()
+		command.SetRefresh(refresh)
+		return command.Execute(args)
+	},
+}
 
-	// Handle help flags
-	if os.Args[1] == "--help" || os.Args[1] == "-h" || os.Args[1] == "help" {
-		if err := command.Execute([]string{}); err != nil {
-			fmt.Printf("Error: %v\n", err)
-			os.Exit(1)
-		}
-		return
-	}
+func init() {
+	// Add flags
+	MakeCmd.Flags().Bool("refresh", false, "Force refresh templates from remote repository")
 
-	// Handle list command
-	if os.Args[1] == "list" {
-		if err := command.ListAvailableTypes(); err != nil {
-			fmt.Printf("Error: %v\n", err)
-			os.Exit(1)
-		}
-		return
-	}
-
-	// Execute make command
-	if err := command.Execute(os.Args[1:]); err != nil {
-		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
-	}
+	// Add subcommands
+	MakeCmd.AddCommand(&cobra.Command{
+		Use:   "list",
+		Short: "List available template types",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			command := make.NewMakeCommand()
+			return command.ListAvailableTypes()
+		},
+	})
 }

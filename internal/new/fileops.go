@@ -20,22 +20,17 @@ func (tm *TemplateManager) copyTemplate(cachedPath, projectPath string) error {
 }
 
 // copyStubToCache copies .stub directory to filestub cache
-func (tm *TemplateManager) copyStubToCache(templateName, version, cachedPath string) error {
+func (tm *TemplateManager) copyStubToCache(templateURL, cachedPath string) error {
 	// Get commit hash from cached template
 	commitHash := tm.getGitCommit(cachedPath)
 	if commitHash == "" {
-		commitHash = version // Fallback to version if commit hash not available
+		return fmt.Errorf("no commit hash available")
 	}
 
-	// Create filestub cache path: ~/.elsa-cache/filestub/{template_name}/{commit_hash}/.stub
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("failed to get home directory: %v", err)
-	}
-
-	filestubCacheDir := filepath.Join(homeDir, ".elsa-cache", "filestub", templateName, commitHash)
+	// Create filestub cache path using git URL
+	filestubCacheDir := tm.getFilestubCacheDir(templateURL)
 	stubSourcePath := filepath.Join(cachedPath, ".stub")
-	stubDestPath := filepath.Join(filestubCacheDir, ".stub")
+	stubDestPath := filepath.Join(filestubCacheDir, commitHash, ".stub")
 
 	// Check if .stub directory exists in cached template
 	if _, err := os.Stat(stubSourcePath); os.IsNotExist(err) {
@@ -336,4 +331,25 @@ func (tm *TemplateManager) runGoModTidy(projectPath string) error {
 	}
 
 	return nil
+}
+
+// gitURLToPath converts git URL to filesystem-safe path
+func (tm *TemplateManager) gitURLToPath(gitURL string) string {
+	// Remove protocol prefix (https://, git@, etc.)
+	url := strings.TrimPrefix(gitURL, "https://")
+	url = strings.TrimPrefix(url, "http://")
+	url = strings.TrimPrefix(url, "git@")
+	url = strings.TrimSuffix(url, ".git")
+
+	// Replace : with / for SSH URLs (git@github.com:user/repo -> github.com/user/repo)
+	url = strings.ReplaceAll(url, ":", "/")
+
+	return url
+}
+
+// getFilestubCacheDir returns the filestub cache directory for a git URL
+func (tm *TemplateManager) getFilestubCacheDir(gitURL string) string {
+	homeDir, _ := os.UserHomeDir()
+	urlPath := tm.gitURLToPath(gitURL)
+	return filepath.Join(homeDir, ".elsa-cache", "filestub", urlPath)
 }
