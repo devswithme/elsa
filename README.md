@@ -327,6 +327,52 @@ The `elsa new` command follows this optimized workflow:
 
 This ensures your new project is ready to run immediately with all dependencies properly resolved.
 
+### Make Commands
+| Command | Description |
+|---------|-------------|
+| `elsa make <template-type> <name>` | Generate file from template |
+| `elsa make list` | List available template types |
+| `elsa make --help` | Show make command help |
+
+#### Template Types
+The available template types are defined in your project's `.elsa-config.yaml` file. Common examples:
+- `repository` - Generate repository layer files
+- `service` - Generate service layer files
+- `handler` - Generate HTTP/GRPC handler files
+
+#### Examples
+```bash
+# Generate repository
+elsa make repository user_repository
+
+# Generate service
+elsa make service user_service
+
+# Generate with folder structure
+elsa make repository health/health_repository
+
+# List available template types
+elsa make list
+```
+
+#### Configuration
+The make system uses `.elsa-config.yaml` in your project root:
+```yaml
+source:
+  name: xarch
+  version: v1.2.3
+  git_url: https://github.com/risoftinc/xarch
+  git_commit: abc123def456
+
+make:
+  repository:
+    template: repository/template.go.tmpl
+    output: domain/repositories
+  service:
+    template: service/template.go.tmpl
+    output: domain/services
+```
+
 ## 🔧 Configuration
 
 ### Elsafile Format
