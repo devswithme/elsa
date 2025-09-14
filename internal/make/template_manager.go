@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -92,7 +91,6 @@ func (tm *TemplateManager) GenerateFile(templateType, name string, refresh bool)
 		return fmt.Errorf("failed to write file: %v", err)
 	}
 
-	fmt.Printf("✅ Generated: %s\n", data.OutputPath)
 	return nil
 }
 
@@ -109,7 +107,7 @@ func (tm *TemplateManager) resolveTemplatePath(templateConfig MakeConfig, source
 	}
 
 	// Priority 2: Filestub cache (new structure)
-	filestubPath := tm.getFilestubCachePath(sourceInfo.Name, sourceInfo.GitCommit, templateType, templateFile)
+	filestubPath := tm.getFilestubCachePath(sourceInfo.GitURL, sourceInfo.GitCommit, templateType, templateFile)
 	if !refresh && tm.templateExists(filestubPath) {
 		return filestubPath
 	}
@@ -142,7 +140,7 @@ func (tm *TemplateManager) resolveTemplatePath(templateConfig MakeConfig, source
 				// Try to clone with latest commit
 				if tm.cloneStubToCache(sourceInfo) {
 					// Try again after cloning
-					filestubPath = tm.getFilestubCachePath(sourceInfo.Name, sourceInfo.GitCommit, templateType, templateFile)
+					filestubPath = tm.getFilestubCachePath(sourceInfo.GitURL, sourceInfo.GitCommit, templateType, templateFile)
 					if tm.templateExists(filestubPath) {
 						return filestubPath
 					}
@@ -153,14 +151,7 @@ func (tm *TemplateManager) resolveTemplatePath(templateConfig MakeConfig, source
 		}
 	}
 
-	// Priority 4: Legacy cache template
-	cachePath := tm.getCachePath(sourceInfo.Name, sourceInfo.Version)
-	cacheTemplatePath := filepath.Join(cachePath, ".stub", templateType, templateFile)
-	if !refresh && tm.templateExists(cacheTemplatePath) {
-		return cacheTemplatePath
-	}
-
-	// Priority 5: Fallback to local .stub (for xarch template)
+	// Fallback to local .stub
 	return localStubPath
 }
 
@@ -176,32 +167,20 @@ func (tm *TemplateManager) getCachePath(templateName, version string) string {
 }
 
 // getFilestubCachePath returns the filestub cache path for a template
-func (tm *TemplateManager) getFilestubCachePath(templateName, commitHash, templateType, templateFile string) string {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "" // Return empty if can't get home directory
-	}
-
-	// Use commit hash if available, otherwise use template name as fallback
+func (tm *TemplateManager) getFilestubCachePath(gitURL, commitHash, templateType, templateFile string) string {
 	if commitHash == "" {
-		commitHash = templateName
+		return "" // Return empty if no commit hash
 	}
 
-	return filepath.Join(homeDir, ".elsa-cache", "filestub", templateName, commitHash, ".stub", templateType, templateFile)
+	baseDir := getFilestubCacheDir(gitURL)
+	return filepath.Join(baseDir, commitHash, ".stub", templateType, templateFile)
 }
 
 // cloneStubToCache clones only the .stub directory from the template repository
 func (tm *TemplateManager) cloneStubToCache(sourceInfo SourceInfo) bool {
-	// Get home directory
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		fmt.Printf("❌ Failed to get home directory: %v\n", err)
-		return false
-	}
-
-	// Create filestub cache directory
-	filestubCacheDir := filepath.Join(homeDir, ".elsa-cache", "filestub", sourceInfo.Name, sourceInfo.GitCommit)
-	stubDestPath := filepath.Join(filestubCacheDir, ".stub")
+	// Create filestub cache directory using git URL
+	filestubCacheDir := getFilestubCacheDir(sourceInfo.GitURL)
+	stubDestPath := filepath.Join(filestubCacheDir, sourceInfo.GitCommit, ".stub")
 
 	// Create temporary directory for cloning
 	tempDir := filepath.Join(filestubCacheDir, "temp")
@@ -239,47 +218,6 @@ func (tm *TemplateManager) cloneStubToCache(sourceInfo SourceInfo) bool {
 	}
 
 	return true
-}
-
-// cloneRepository clones a git repository to the specified directory
-func (tm *TemplateManager) cloneRepository(gitURL, destPath, commitHash string) error {
-	// Remove existing directory if it exists
-	if err := os.RemoveAll(destPath); err != nil {
-		return fmt.Errorf("failed to remove existing directory: %v", err)
-	}
-
-	// Create destination directory
-	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
-		return fmt.Errorf("failed to create destination directory: %v", err)
-	}
-
-	// Clone the repository
-	cmd := exec.Command("git", "clone", "--depth", "1", gitURL, destPath)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to clone repository: %v", err)
-	}
-
-	// Checkout specific commit if provided
-	if commitHash != "" {
-		checkoutCmd := exec.Command("git", "checkout", commitHash)
-		checkoutCmd.Dir = destPath
-		if err := checkoutCmd.Run(); err != nil {
-			// If checkout fails, try to fetch and checkout
-			fetchCmd := exec.Command("git", "fetch", "origin", commitHash)
-			fetchCmd.Dir = destPath
-			if err := fetchCmd.Run(); err != nil {
-				return fmt.Errorf("failed to checkout commit %s: %v", commitHash, err)
-			}
-
-			checkoutCmd = exec.Command("git", "checkout", commitHash)
-			checkoutCmd.Dir = destPath
-			if err := checkoutCmd.Run(); err != nil {
-				return fmt.Errorf("failed to checkout commit %s after fetch: %v", commitHash, err)
-			}
-		}
-	}
-
-	return nil
 }
 
 // copyDirectory recursively copies directory contents, excluding specified directories
@@ -340,34 +278,6 @@ func (tm *TemplateManager) copyFile(src, dst string, mode os.FileMode) error {
 	// Copy content
 	_, err = dstFile.ReadFrom(srcFile)
 	return err
-}
-
-// getLatestCommitFromRemote gets the latest commit hash from remote repository
-func (tm *TemplateManager) getLatestCommitFromRemote(gitURL string) string {
-	fmt.Printf("🔄 Getting latest commit from %s\n", gitURL)
-
-	// Use HEAD to get the latest commit directly
-	cmd := exec.Command("git", "ls-remote", gitURL, "HEAD")
-	output, err := cmd.Output()
-	if err != nil {
-		fmt.Printf("❌ Failed to get latest commit from HEAD: %v\n", err)
-		return ""
-	}
-
-	lines := strings.Split(string(output), "\n")
-	if len(lines) > 0 && lines[0] != "" {
-		parts := strings.Fields(lines[0])
-		if len(parts) > 0 {
-			commit := parts[0]
-			if len(commit) > 7 {
-				commit = commit[:7] // Return short commit hash
-			}
-			return commit
-		}
-	}
-
-	fmt.Printf("❌ No commits found in repository\n")
-	return ""
 }
 
 // updateConfigWithCommit updates the .elsa-config.yaml with the latest commit hash
@@ -436,14 +346,14 @@ func (tm *TemplateManager) loadTemplate(templatePath string) (*template.Template
 // createTemplateFunctions creates custom template functions
 func (tm *TemplateManager) createTemplateFunctions() template.FuncMap {
 	return template.FuncMap{
-		"title":    tm.toTitleCase,
+		"title":    toTitleCase,
 		"lower":    strings.ToLower,
 		"upper":    strings.ToUpper,
-		"camel":    tm.toCamelCase,
-		"snake":    tm.toSnakeCase,
-		"pascal":   tm.toPascalCase,
-		"plural":   tm.toPlural,
-		"singular": tm.toSingular,
+		"camel":    toCamelCase,
+		"snake":    toSnakeCase,
+		"pascal":   toPascalCase,
+		"plural":   toPlural,
+		"singular": toSingular,
 	}
 }
 
@@ -452,7 +362,7 @@ func (tm *TemplateManager) writeFile(filePath string, content []byte) error {
 	// Check if file already exists and ask for confirmation
 	if _, err := os.Stat(filePath); err == nil {
 		// File exists, ask for confirmation
-		fmt.Printf("⚠️  File %s already exists. Do you want to replace it? (y/N): ", filePath)
+		fmt.Printf("⚠️  File %s already exists. Do you want to replace it? (Y/N): ", filePath)
 
 		var response string
 		fmt.Scanln(&response)
@@ -463,69 +373,8 @@ func (tm *TemplateManager) writeFile(filePath string, content []byte) error {
 		}
 	}
 
+	fmt.Printf("✅ Generated: %s\n", filePath)
 	return os.WriteFile(filePath, content, 0644)
-}
-
-// String manipulation functions
-func (tm *TemplateManager) toTitleCase(s string) string {
-	// Convert string to title case
-	if len(s) == 0 {
-		return s
-	}
-	return strings.ToUpper(string(s[0])) + strings.ToLower(s[1:])
-}
-
-func (tm *TemplateManager) toCamelCase(s string) string {
-	// Convert snake_case to camelCase
-	parts := strings.Split(s, "_")
-	if len(parts) == 0 {
-		return s
-	}
-
-	result := strings.ToLower(parts[0])
-	for _, part := range parts[1:] {
-		result += tm.toTitleCase(part)
-	}
-	return result
-}
-
-func (tm *TemplateManager) toPascalCase(s string) string {
-	// Convert snake_case to PascalCase
-	parts := strings.Split(s, "_")
-	var result string
-	for _, part := range parts {
-		result += tm.toTitleCase(part)
-	}
-	return result
-}
-
-func (tm *TemplateManager) toPlural(s string) string {
-	s = strings.ToLower(s)
-
-	// Simple pluralization
-	if strings.HasSuffix(s, "y") {
-		return strings.TrimSuffix(s, "y") + "ies"
-	}
-	if strings.HasSuffix(s, "s") || strings.HasSuffix(s, "sh") || strings.HasSuffix(s, "ch") {
-		return s + "es"
-	}
-	return s + "s"
-}
-
-func (tm *TemplateManager) toSingular(s string) string {
-	s = strings.ToLower(s)
-
-	// Simple singularization
-	if strings.HasSuffix(s, "ies") {
-		return strings.TrimSuffix(s, "ies") + "y"
-	}
-	if strings.HasSuffix(s, "es") {
-		return strings.TrimSuffix(s, "es")
-	}
-	if strings.HasSuffix(s, "s") {
-		return strings.TrimSuffix(s, "s")
-	}
-	return s
 }
 
 // extractTemplateType extracts template type from template config
@@ -548,25 +397,4 @@ func (tm *TemplateManager) extractTemplateFile(template string) string {
 	}
 	// If no "/", use default template file name
 	return "template.go.tmpl"
-}
-
-// promptOutputDirectory prompts user for output directory
-func (tm *TemplateManager) promptOutputDirectory(templateType string) (string, error) {
-	fmt.Printf("📁 Output directory for '%s' is not configured.\n", templateType)
-	fmt.Printf("📝 Please enter the output directory (e.g., domain/repositories): ")
-
-	var outputDir string
-	fmt.Scanln(&outputDir)
-
-	// Validate input
-	outputDir = strings.TrimSpace(outputDir)
-	if outputDir == "" {
-		return "", fmt.Errorf("output directory cannot be empty")
-	}
-
-	// Remove trailing slash if present
-	outputDir = strings.TrimSuffix(outputDir, "/")
-
-	fmt.Printf("📂 Using output directory: %s\n", outputDir)
-	return outputDir, nil
 }

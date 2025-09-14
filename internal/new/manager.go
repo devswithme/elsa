@@ -117,7 +117,7 @@ func (tm *TemplateManager) createProject(templateName, version, projectPath, mod
 	}
 
 	// Copy .stub to filestub cache
-	if err := tm.copyStubToCache(templateName, version, cachedPath); err != nil {
+	if err := tm.copyStubToCache(templateURL, cachedPath); err != nil {
 		return fmt.Errorf("failed to copy .stub to cache: %v", err)
 	}
 
@@ -199,8 +199,6 @@ func (tm *TemplateManager) generateElsaConfig(projectPath, templateName, version
 
 	// Add source section first
 	config["source"] = map[string]string{
-		"name":       templateName,
-		"version":    version,
 		"git_url":    templateURL,
 		"git_commit": gitCommit,
 	}
