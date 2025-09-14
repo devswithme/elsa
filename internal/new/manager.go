@@ -3,9 +3,12 @@ package new
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"go.risoftinc.com/elsa/constants"
+	"gopkg.in/yaml.v3"
 )
 
 // CreateProjectWithOutput creates a new project and handles all output messages
@@ -156,5 +159,67 @@ func (tm *TemplateManager) createProject(templateName, version, projectPath, mod
 		return fmt.Errorf(constants.NewErrorCleanupFailed, err)
 	}
 
+	// Generate .elsa-config.yaml if config file doesn't exist
+	if !tm.hasElsaConfig(projectPath) {
+		if err := tm.generateElsaConfig(projectPath, templateName, version, templateURL); err != nil {
+			return fmt.Errorf("failed to generate config: %v", err)
+		}
+	}
+
 	return nil
+}
+
+// generateElsaConfig generates .elsa-config.yaml file for the project
+func (tm *TemplateManager) generateElsaConfig(projectPath, templateName, version, templateURL string) error {
+	// Get git commit hash if available
+	gitCommit := tm.getGitCommit(projectPath)
+
+	// Create config data
+	config := map[string]interface{}{
+		"source": map[string]string{
+			"name":       templateName,
+			"version":    version,
+			"git_url":    templateURL,
+			"git_commit": gitCommit,
+		},
+	}
+
+	// Convert to YAML
+	yamlData, err := yaml.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config to YAML: %v", err)
+	}
+
+	// Write to file
+	configPath := filepath.Join(projectPath, ".elsa-config.yaml")
+	if err := os.WriteFile(configPath, yamlData, 0644); err != nil {
+		return fmt.Errorf("failed to write config file: %v", err)
+	}
+
+	fmt.Printf("Generated: %s\n", configPath)
+	return nil
+}
+
+// getGitCommit gets the current git commit hash
+func (tm *TemplateManager) getGitCommit(projectPath string) string {
+	// Try to get git commit hash
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = projectPath
+	output, err := cmd.Output()
+	if err != nil {
+		return "unknown"
+	}
+
+	commit := strings.TrimSpace(string(output))
+	if len(commit) > 7 {
+		return commit[:7] // Return short commit hash
+	}
+	return commit
+}
+
+// hasElsaConfig checks if the project already has .elsa-config.yaml
+func (tm *TemplateManager) hasElsaConfig(projectPath string) bool {
+	configPath := filepath.Join(projectPath, ".elsa-config.yaml")
+	_, err := os.Stat(configPath)
+	return err == nil
 }

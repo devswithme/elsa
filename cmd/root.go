@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.risoftinc.com/elsa/cmd/elsafile"
 	"go.risoftinc.com/elsa/cmd/generate"
+	"go.risoftinc.com/elsa/cmd/make"
 	"go.risoftinc.com/elsa/cmd/migrate"
 	"go.risoftinc.com/elsa/cmd/new"
 	"go.risoftinc.com/elsa/cmd/watch"
@@ -54,6 +55,9 @@ func init() {
 
 	// Add new command
 	rootCmd.AddCommand(new.NewCmd)
+
+	// Add make command
+	rootCmd.AddCommand(make.MakeCmd)
 }
 
 // SetVersionInfo sets the version information for the application
