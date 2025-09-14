@@ -15,8 +15,8 @@ func (tm *TemplateManager) copyTemplate(cachedPath, projectPath string) error {
 		return err
 	}
 
-	// Copy all files except .git
-	return tm.copyDirectory(cachedPath, projectPath, []string{".git"})
+	// Copy all files except .git and .stub
+	return tm.copyDirectory(cachedPath, projectPath, []string{".git", ".stub"})
 }
 
 // copyDirectory recursively copies directory contents, excluding specified directories

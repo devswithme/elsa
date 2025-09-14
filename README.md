@@ -49,6 +49,13 @@
 - **Version Support**: Support for specific tags, branches, and latest versions
 - **Module Management**: Automatic go.mod module name creation
 
+### 🏗️ Make System
+- **Dynamic Template Types**: Generate files from configurable templates
+- **Folder Structure Support**: Create files in custom directory structures
+- **Template Versioning**: Support multiple template versions
+- **Custom Template Override**: Override templates per project
+- **Smart Template Resolution**: Priority-based template loading
+
 ## 📦 Installation
 
 ### Prerequisites
@@ -109,6 +116,21 @@ elsa new xarch@v1.2.3 my-api --module "github.com/username/my-api"
 
 # Create with custom output directory
 elsa new xarch my-api --module "github.com/username/my-api" --output "./projects"
+```
+
+### 5. Generate Files with Make
+```bash
+# Generate repository
+elsa make repository user_repository
+
+# Generate service
+elsa make service user_service
+
+# Generate with folder structure
+elsa make repository health/health_repository
+
+# List available template types
+elsa make list
 ```
 
 **About xarch:**
@@ -416,6 +438,21 @@ go test ./...
 # Build project
 go build -o elsa ./cmd/elsa
 ```
+
+## 📚 Documentation
+
+### Detailed Guides
+- **[Make System Guideline](MAKE_GUIDELINE.md)** - Complete guide for `elsa make` system
+  - Template development
+  - YAML configuration
+  - Advanced usage patterns
+  - Troubleshooting guide
+
+### Command Reference
+- `elsa --help` - General help
+- `elsa make --help` - Make system help
+- `elsa migration --help` - Migration commands
+- `elsa watch --help` - File watching options
 
 ## 📄 License
 
