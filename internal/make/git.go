@@ -62,7 +62,12 @@ func (tm *TemplateManager) getLatestCommitFromRemote(gitURL string) string {
 		if line != "" && !strings.HasPrefix(line, "#") {
 			parts := strings.Fields(line)
 			if len(parts) >= 1 {
-				return parts[0]
+				commit := parts[0]
+				// Return short commit hash (7 characters)
+				if len(commit) > 7 {
+					return commit[:7]
+				}
+				return commit
 			}
 		}
 	}
@@ -78,5 +83,10 @@ func (tm *TemplateManager) getActualCommitFromClonedRepo(repoPath string) string
 	if err != nil {
 		return ""
 	}
-	return strings.TrimSpace(string(output))
+	commit := strings.TrimSpace(string(output))
+	// Return short commit hash (7 characters)
+	if len(commit) > 7 {
+		return commit[:7]
+	}
+	return commit
 }
