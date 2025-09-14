@@ -88,15 +88,27 @@ func (fw *FileWatcher) ShouldRestart(event fsnotify.Event) bool {
 
 // Watch starts watching for file changes and returns event channels
 func (fw *FileWatcher) Watch() (chan fsnotify.Event, chan error) {
-	events := make(chan fsnotify.Event)
-	errors := make(chan error)
+	events := make(chan fsnotify.Event, 100) // Buffered channel to prevent blocking
+	errors := make(chan error, 10)           // Buffered channel to prevent blocking
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				select {
+				case errors <- fmt.Errorf("panic in watcher: %v", r):
+				default:
+				}
+			}
+			// Close channels when goroutine exits
+			close(events)
+			close(errors)
+		}()
+
 		for {
 			select {
 			case event, ok := <-fw.watcher.Events:
 				if !ok {
-					close(events)
+					// Channel closed, exit gracefully
 					return
 				}
 				if fw.ShouldRestart(event) {
@@ -104,15 +116,27 @@ func (fw *FileWatcher) Watch() (chan fsnotify.Event, chan error) {
 					if fw.onFileChange != nil {
 						fw.onFileChange(event.Name)
 					}
-					events <- event
+
+					// Non-blocking send to events channel
+					select {
+					case events <- event:
+					default:
+						// Channel full, skip this event
+					}
 				}
 
 			case err, ok := <-fw.watcher.Errors:
 				if !ok {
-					close(errors)
+					// Channel closed, exit gracefully
 					return
 				}
-				errors <- err
+
+				// Non-blocking send to errors channel
+				select {
+				case errors <- err:
+				default:
+					// Channel full, skip this error
+				}
 			}
 		}
 	}()
@@ -122,7 +146,15 @@ func (fw *FileWatcher) Watch() (chan fsnotify.Event, chan error) {
 
 // Close closes the file watcher
 func (fw *FileWatcher) Close() error {
-	return fw.watcher.Close()
+	if fw.watcher != nil {
+		return fw.watcher.Close()
+	}
+	return nil
+}
+
+// IsClosed checks if the watcher is closed
+func (fw *FileWatcher) IsClosed() bool {
+	return fw.watcher == nil
 }
 
 // GetCurrentDir returns the current working directory

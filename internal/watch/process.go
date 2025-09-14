@@ -46,9 +46,17 @@ func (pm *ProcessManager) StartCommand(command string) error {
 
 	// Monitor process in background
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				fmt.Printf(constants.MsgWatchError+"\n", fmt.Sprintf("Panic in process monitor: %v", r))
+			}
+		}()
+
 		if err := cmd.Wait(); err != nil {
 			// Don't show error for terminated commands
-			if err.Error() != "signal: interrupt" && err.Error() != "exit status 1" {
+			if err.Error() != "signal: interrupt" &&
+				err.Error() != "exit status 1" &&
+				err.Error() != "signal: killed" {
 				fmt.Printf(constants.MsgWatchExitedWithError+"\n", err)
 			}
 		} else {
