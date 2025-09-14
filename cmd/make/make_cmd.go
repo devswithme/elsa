@@ -14,15 +14,21 @@ var MakeCmd = &cobra.Command{
 Examples:
   elsa make repository user_repository
   elsa make service user_service
-  elsa make repository health/health_repository`,
+  elsa make repository health/health_repository
+  elsa make repository user_repository --refresh`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		refresh, _ := cmd.Flags().GetBool("refresh")
 		command := make.NewMakeCommand()
+		command.SetRefresh(refresh)
 		return command.Execute(args)
 	},
 }
 
 func init() {
+	// Add flags
+	MakeCmd.Flags().Bool("refresh", false, "Force refresh templates from remote repository")
+
 	// Add subcommands
 	MakeCmd.AddCommand(&cobra.Command{
 		Use:   "list",

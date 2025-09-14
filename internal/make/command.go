@@ -8,6 +8,7 @@ import (
 // MakeCommand handles the make command execution
 type MakeCommand struct {
 	templateManager *TemplateManager
+	refresh         bool
 }
 
 // NewMakeCommand creates a new make command
@@ -15,6 +16,11 @@ func NewMakeCommand() *MakeCommand {
 	return &MakeCommand{
 		templateManager: NewTemplateManager(),
 	}
+}
+
+// SetRefresh sets the refresh flag
+func (mc *MakeCommand) SetRefresh(refresh bool) {
+	mc.refresh = refresh
 }
 
 // Execute executes the make command
@@ -32,7 +38,7 @@ func (mc *MakeCommand) Execute(args []string) error {
 	}
 
 	// Generate file
-	return mc.templateManager.GenerateFile(templateType, name)
+	return mc.templateManager.GenerateFile(templateType, name, mc.refresh)
 }
 
 // validateName validates the name format

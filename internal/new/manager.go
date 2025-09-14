@@ -116,6 +116,11 @@ func (tm *TemplateManager) createProject(templateName, version, projectPath, mod
 		return fmt.Errorf("failed to copy template: %v", err)
 	}
 
+	// Copy .stub to filestub cache
+	if err := tm.copyStubToCache(templateName, version, cachedPath); err != nil {
+		return fmt.Errorf("failed to copy .stub to cache: %v", err)
+	}
+
 	// Update go.mod module name and all import statements
 	fmt.Printf(constants.NewInfoUpdatingModule+"\n", moduleName)
 	originalModule, err := tm.updateGoMod(projectPath, moduleName)
@@ -154,34 +159,57 @@ func (tm *TemplateManager) createProject(templateName, version, projectPath, mod
 		return fmt.Errorf(constants.NewErrorGoModTidy, err)
 	}
 
+	// Generate .elsa-config.yaml if config file doesn't exist or has wrong format (before cleaning git history)
+	if !tm.hasValidElsaConfig(projectPath) {
+		if err := tm.generateElsaConfig(projectPath, templateName, version, templateURL, cachedPath); err != nil {
+			return fmt.Errorf("failed to generate config: %v", err)
+		}
+	}
+
 	// Clean git history
 	if err := tm.cleanGitHistory(projectPath); err != nil {
 		return fmt.Errorf(constants.NewErrorCleanupFailed, err)
-	}
-
-	// Generate .elsa-config.yaml if config file doesn't exist
-	if !tm.hasElsaConfig(projectPath) {
-		if err := tm.generateElsaConfig(projectPath, templateName, version, templateURL); err != nil {
-			return fmt.Errorf("failed to generate config: %v", err)
-		}
 	}
 
 	return nil
 }
 
 // generateElsaConfig generates .elsa-config.yaml file for the project
-func (tm *TemplateManager) generateElsaConfig(projectPath, templateName, version, templateURL string) error {
-	// Get git commit hash if available
-	gitCommit := tm.getGitCommit(projectPath)
+func (tm *TemplateManager) generateElsaConfig(projectPath, templateName, version, templateURL, cachedPath string) error {
+	// Get git commit hash from cached template (not from project)
+	gitCommit := tm.getGitCommit(cachedPath)
 
-	// Create config data
-	config := map[string]interface{}{
-		"source": map[string]string{
-			"name":       templateName,
-			"version":    version,
-			"git_url":    templateURL,
-			"git_commit": gitCommit,
-		},
+	configPath := filepath.Join(projectPath, ".elsa-config.yaml")
+
+	// Try to load existing config to preserve other sections
+	var existingConfig map[string]interface{}
+	if data, err := os.ReadFile(configPath); err == nil {
+		// Parse existing config
+		if err := yaml.Unmarshal(data, &existingConfig); err != nil {
+			// If parsing fails, start with empty config
+			existingConfig = make(map[string]interface{})
+		}
+	} else {
+		// If file doesn't exist, start with empty config
+		existingConfig = make(map[string]interface{})
+	}
+
+	// Create ordered config with source at the top
+	config := make(map[string]interface{})
+
+	// Add source section first
+	config["source"] = map[string]string{
+		"name":       templateName,
+		"version":    version,
+		"git_url":    templateURL,
+		"git_commit": gitCommit,
+	}
+
+	// Add other sections from existing config (excluding source to avoid duplication)
+	for key, value := range existingConfig {
+		if key != "source" {
+			config[key] = value
+		}
 	}
 
 	// Convert to YAML
@@ -191,12 +219,10 @@ func (tm *TemplateManager) generateElsaConfig(projectPath, templateName, version
 	}
 
 	// Write to file
-	configPath := filepath.Join(projectPath, ".elsa-config.yaml")
 	if err := os.WriteFile(configPath, yamlData, 0644); err != nil {
 		return fmt.Errorf("failed to write config file: %v", err)
 	}
 
-	fmt.Printf("Generated: %s\n", configPath)
 	return nil
 }
 
@@ -217,9 +243,46 @@ func (tm *TemplateManager) getGitCommit(projectPath string) string {
 	return commit
 }
 
-// hasElsaConfig checks if the project already has .elsa-config.yaml
-func (tm *TemplateManager) hasElsaConfig(projectPath string) bool {
+// hasValidElsaConfig checks if the project has a valid .elsa-config.yaml with correct format
+func (tm *TemplateManager) hasValidElsaConfig(projectPath string) bool {
 	configPath := filepath.Join(projectPath, ".elsa-config.yaml")
-	_, err := os.Stat(configPath)
-	return err == nil
+
+	// Check if file exists
+	if _, err := os.Stat(configPath); err != nil {
+		return false
+	}
+
+	// Read and parse the config file
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return false
+	}
+
+	// Parse YAML to check format
+	var config map[string]interface{}
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return false
+	}
+
+	// Check if it has the correct "source" structure
+	source, ok := config["source"].(map[string]interface{})
+	if !ok {
+		return false
+	}
+
+	// Check if source has required fields
+	if _, hasName := source["name"]; !hasName {
+		return false
+	}
+	if _, hasVersion := source["version"]; !hasVersion {
+		return false
+	}
+	if _, hasGitURL := source["git_url"]; !hasGitURL {
+		return false
+	}
+	if _, hasGitCommit := source["git_commit"]; !hasGitCommit {
+		return false
+	}
+
+	return true
 }

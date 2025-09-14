@@ -19,6 +19,48 @@ func (tm *TemplateManager) copyTemplate(cachedPath, projectPath string) error {
 	return tm.copyDirectory(cachedPath, projectPath, []string{".git", ".stub"})
 }
 
+// copyStubToCache copies .stub directory to filestub cache
+func (tm *TemplateManager) copyStubToCache(templateName, version, cachedPath string) error {
+	// Get commit hash from cached template
+	commitHash := tm.getGitCommit(cachedPath)
+	if commitHash == "" {
+		commitHash = version // Fallback to version if commit hash not available
+	}
+
+	// Create filestub cache path: ~/.elsa-cache/filestub/{template_name}/{commit_hash}/.stub
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get home directory: %v", err)
+	}
+
+	filestubCacheDir := filepath.Join(homeDir, ".elsa-cache", "filestub", templateName, commitHash)
+	stubSourcePath := filepath.Join(cachedPath, ".stub")
+	stubDestPath := filepath.Join(filestubCacheDir, ".stub")
+
+	// Check if .stub directory exists in cached template
+	if _, err := os.Stat(stubSourcePath); os.IsNotExist(err) {
+		// No .stub directory found, skip copying
+		return nil
+	}
+
+	// Remove existing .stub in cache if it exists
+	if err := os.RemoveAll(stubDestPath); err != nil {
+		return fmt.Errorf("failed to remove existing .stub cache: %v", err)
+	}
+
+	// Create destination directory
+	if err := os.MkdirAll(filestubCacheDir, 0755); err != nil {
+		return fmt.Errorf("failed to create filestub cache directory: %v", err)
+	}
+
+	// Copy .stub directory to cache
+	if err := tm.copyDirectory(stubSourcePath, stubDestPath, []string{}); err != nil {
+		return fmt.Errorf("failed to copy .stub to cache: %v", err)
+	}
+
+	return nil
+}
+
 // copyDirectory recursively copies directory contents, excluding specified directories
 func (tm *TemplateManager) copyDirectory(src, dst string, excludeDirs []string) error {
 	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
