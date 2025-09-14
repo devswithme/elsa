@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -33,7 +34,7 @@ func (tm *TemplateManager) LoadProjectConfig(projectPath string) (*ProjectConfig
 }
 
 // GenerateFile generates a file from template
-func (tm *TemplateManager) GenerateFile(templateType, name string) error {
+func (tm *TemplateManager) GenerateFile(templateType, name string, refresh bool) error {
 	// Load project config
 	config, err := tm.LoadProjectConfig(".")
 	if err != nil {
@@ -72,7 +73,7 @@ func (tm *TemplateManager) GenerateFile(templateType, name string) error {
 	}
 
 	// Resolve template path using template config
-	templatePath := tm.resolveTemplatePath(templateConfig, config.Source)
+	templatePath := tm.resolveTemplatePath(templateConfig, config.Source, refresh)
 	fmt.Printf("🔍 Using template path: %s\n", templatePath)
 
 	// Load and execute template
@@ -96,7 +97,7 @@ func (tm *TemplateManager) GenerateFile(templateType, name string) error {
 }
 
 // resolveTemplatePath resolves the template path based on priority
-func (tm *TemplateManager) resolveTemplatePath(templateConfig MakeConfig, sourceInfo SourceInfo) string {
+func (tm *TemplateManager) resolveTemplatePath(templateConfig MakeConfig, sourceInfo SourceInfo, refresh bool) string {
 	// Get template type from template config
 	templateType := tm.extractTemplateType(templateConfig.Template)
 	templateFile := tm.extractTemplateFile(templateConfig.Template)
@@ -107,14 +108,59 @@ func (tm *TemplateManager) resolveTemplatePath(templateConfig MakeConfig, source
 		return localStubPath
 	}
 
-	// Priority 2: Cache template
+	// Priority 2: Filestub cache (new structure)
+	filestubPath := tm.getFilestubCachePath(sourceInfo.Name, sourceInfo.GitCommit, templateType, templateFile)
+	if !refresh && tm.templateExists(filestubPath) {
+		return filestubPath
+	}
+
+	// Priority 3: Try to clone .stub if not found in filestub cache or if refresh is requested
+	if refresh {
+		fmt.Printf("🔄 Refresh requested, cloning .stub from remote repository\n")
+	}
+
+	if sourceInfo.GitCommit != "" {
+		if tm.cloneStubToCache(sourceInfo) {
+			// Try again after cloning
+			if tm.templateExists(filestubPath) {
+				return filestubPath
+			}
+		}
+	} else if sourceInfo.GitURL != "" {
+		// If git_commit is empty but git_url exists, get latest commit and clone
+		fmt.Printf("🔍 Git commit is empty, getting latest commit from: %s\n", sourceInfo.GitURL)
+		latestCommit := tm.getLatestCommitFromRemote(sourceInfo.GitURL)
+		if latestCommit != "" {
+			fmt.Printf("🔍 Found latest commit: %s\n", latestCommit)
+			// Update config with latest commit
+			if err := tm.updateConfigWithCommit(latestCommit); err != nil {
+				fmt.Printf("⚠️  Failed to update config: %v\n", err)
+			} else {
+				fmt.Printf("✅ Config updated successfully\n")
+				// Update sourceInfo with latest commit
+				sourceInfo.GitCommit = latestCommit
+				// Try to clone with latest commit
+				if tm.cloneStubToCache(sourceInfo) {
+					// Try again after cloning
+					filestubPath = tm.getFilestubCachePath(sourceInfo.Name, sourceInfo.GitCommit, templateType, templateFile)
+					if tm.templateExists(filestubPath) {
+						return filestubPath
+					}
+				}
+			}
+		} else {
+			fmt.Printf("❌ Could not get latest commit from remote\n")
+		}
+	}
+
+	// Priority 4: Legacy cache template
 	cachePath := tm.getCachePath(sourceInfo.Name, sourceInfo.Version)
 	cacheTemplatePath := filepath.Join(cachePath, ".stub", templateType, templateFile)
-	if tm.templateExists(cacheTemplatePath) {
+	if !refresh && tm.templateExists(cacheTemplatePath) {
 		return cacheTemplatePath
 	}
 
-	// Priority 3: Fallback to local .stub (for xarch template)
+	// Priority 5: Fallback to local .stub (for xarch template)
 	return localStubPath
 }
 
@@ -126,7 +172,250 @@ func (tm *TemplateManager) templateExists(templatePath string) bool {
 
 // getCachePath returns the cache path for a template
 func (tm *TemplateManager) getCachePath(templateName, version string) string {
-	return filepath.Join(tm.cacheDir, "templates", templateName, version)
+	return filepath.Join(tm.cacheDir, templateName, version)
+}
+
+// getFilestubCachePath returns the filestub cache path for a template
+func (tm *TemplateManager) getFilestubCachePath(templateName, commitHash, templateType, templateFile string) string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "" // Return empty if can't get home directory
+	}
+
+	// Use commit hash if available, otherwise use template name as fallback
+	if commitHash == "" {
+		commitHash = templateName
+	}
+
+	return filepath.Join(homeDir, ".elsa-cache", "filestub", templateName, commitHash, ".stub", templateType, templateFile)
+}
+
+// cloneStubToCache clones only the .stub directory from the template repository
+func (tm *TemplateManager) cloneStubToCache(sourceInfo SourceInfo) bool {
+	// Get home directory
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Printf("❌ Failed to get home directory: %v\n", err)
+		return false
+	}
+
+	// Create filestub cache directory
+	filestubCacheDir := filepath.Join(homeDir, ".elsa-cache", "filestub", sourceInfo.Name, sourceInfo.GitCommit)
+	stubDestPath := filepath.Join(filestubCacheDir, ".stub")
+
+	// Create temporary directory for cloning
+	tempDir := filepath.Join(filestubCacheDir, "temp")
+	defer os.RemoveAll(tempDir) // Clean up temp directory
+
+	// Clone the repository to temp directory
+	if err := tm.cloneRepository(sourceInfo.GitURL, tempDir, sourceInfo.GitCommit); err != nil {
+		fmt.Printf("❌ Failed to clone repository: %v\n", err)
+		return false
+	}
+
+	// Check if .stub directory exists in cloned repository
+	stubSourcePath := filepath.Join(tempDir, ".stub")
+	if _, err := os.Stat(stubSourcePath); os.IsNotExist(err) {
+		fmt.Printf("⚠️  No .stub directory found in template\n")
+		return false
+	}
+
+	// Create destination directory
+	if err := os.MkdirAll(filestubCacheDir, 0755); err != nil {
+		fmt.Printf("❌ Failed to create cache directory: %v\n", err)
+		return false
+	}
+
+	// Remove existing .stub in cache if it exists
+	if err := os.RemoveAll(stubDestPath); err != nil {
+		fmt.Printf("❌ Failed to remove existing .stub cache: %v\n", err)
+		return false
+	}
+
+	// Copy .stub directory to cache
+	if err := tm.copyDirectory(stubSourcePath, stubDestPath, []string{}); err != nil {
+		fmt.Printf("❌ Failed to copy .stub to cache: %v\n", err)
+		return false
+	}
+
+	return true
+}
+
+// cloneRepository clones a git repository to the specified directory
+func (tm *TemplateManager) cloneRepository(gitURL, destPath, commitHash string) error {
+	// Remove existing directory if it exists
+	if err := os.RemoveAll(destPath); err != nil {
+		return fmt.Errorf("failed to remove existing directory: %v", err)
+	}
+
+	// Create destination directory
+	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+		return fmt.Errorf("failed to create destination directory: %v", err)
+	}
+
+	// Clone the repository
+	cmd := exec.Command("git", "clone", "--depth", "1", gitURL, destPath)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to clone repository: %v", err)
+	}
+
+	// Checkout specific commit if provided
+	if commitHash != "" {
+		checkoutCmd := exec.Command("git", "checkout", commitHash)
+		checkoutCmd.Dir = destPath
+		if err := checkoutCmd.Run(); err != nil {
+			// If checkout fails, try to fetch and checkout
+			fetchCmd := exec.Command("git", "fetch", "origin", commitHash)
+			fetchCmd.Dir = destPath
+			if err := fetchCmd.Run(); err != nil {
+				return fmt.Errorf("failed to checkout commit %s: %v", commitHash, err)
+			}
+
+			checkoutCmd = exec.Command("git", "checkout", commitHash)
+			checkoutCmd.Dir = destPath
+			if err := checkoutCmd.Run(); err != nil {
+				return fmt.Errorf("failed to checkout commit %s after fetch: %v", commitHash, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// copyDirectory recursively copies directory contents, excluding specified directories
+func (tm *TemplateManager) copyDirectory(src, dst string, excludeDirs []string) error {
+	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Skip excluded directories
+		for _, excludeDir := range excludeDirs {
+			if strings.Contains(path, excludeDir) {
+				if info.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+		}
+
+		// Calculate relative path
+		relPath, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+
+		dstPath := filepath.Join(dst, relPath)
+
+		if info.IsDir() {
+			return os.MkdirAll(dstPath, info.Mode())
+		}
+
+		// Copy file
+		return tm.copyFile(path, dstPath, info.Mode())
+	})
+}
+
+// copyFile copies a single file
+func (tm *TemplateManager) copyFile(src, dst string, mode os.FileMode) error {
+	// Create destination directory if it doesn't exist
+	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+		return err
+	}
+
+	// Read source file
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	// Create destination file
+	dstFile, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
+	if err != nil {
+		return err
+	}
+	defer dstFile.Close()
+
+	// Copy content
+	_, err = dstFile.ReadFrom(srcFile)
+	return err
+}
+
+// getLatestCommitFromRemote gets the latest commit hash from remote repository
+func (tm *TemplateManager) getLatestCommitFromRemote(gitURL string) string {
+	fmt.Printf("🔄 Getting latest commit from %s\n", gitURL)
+
+	// Use HEAD to get the latest commit directly
+	cmd := exec.Command("git", "ls-remote", gitURL, "HEAD")
+	output, err := cmd.Output()
+	if err != nil {
+		fmt.Printf("❌ Failed to get latest commit from HEAD: %v\n", err)
+		return ""
+	}
+
+	lines := strings.Split(string(output), "\n")
+	if len(lines) > 0 && lines[0] != "" {
+		parts := strings.Fields(lines[0])
+		if len(parts) > 0 {
+			commit := parts[0]
+			if len(commit) > 7 {
+				commit = commit[:7] // Return short commit hash
+			}
+			return commit
+		}
+	}
+
+	fmt.Printf("❌ No commits found in repository\n")
+	return ""
+}
+
+// updateConfigWithCommit updates the .elsa-config.yaml with the latest commit hash
+func (tm *TemplateManager) updateConfigWithCommit(commitHash string) error {
+	configPath := ".elsa-config.yaml"
+
+	// Read existing config
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to read config file: %v", err)
+	}
+
+	// Parse YAML
+	var config map[string]interface{}
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return fmt.Errorf("failed to parse config: %v", err)
+	}
+
+	// Update source section
+	if source, ok := config["source"].(map[string]interface{}); ok {
+		source["git_commit"] = commitHash
+		config["source"] = source
+	} else {
+		// Create source section if it doesn't exist
+		config["source"] = map[string]interface{}{
+			"git_commit": commitHash,
+		}
+	}
+
+	// Also update template section if it exists and has git_url
+	if template, ok := config["template"].(map[string]interface{}); ok {
+		if gitURL, exists := template["git_url"]; exists && gitURL != "" {
+			template["git_commit"] = commitHash
+			config["template"] = template
+		}
+	}
+
+	// Write updated config
+	updatedData, err := yaml.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal updated config: %v", err)
+	}
+
+	if err := os.WriteFile(configPath, updatedData, 0644); err != nil {
+		return fmt.Errorf("failed to write updated config: %v", err)
+	}
+
+	return nil
 }
 
 // loadTemplate loads and parses a template file

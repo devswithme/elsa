@@ -202,5 +202,5 @@ func (tm *TemplateManager) toSnakeCase(s string) string {
 // getCacheDir returns the cache directory path
 func getCacheDir() string {
 	homeDir, _ := os.UserHomeDir()
-	return filepath.Join(homeDir, ".elsa", "cache")
+	return filepath.Join(homeDir, ".elsa-cache", "templates")
 }
