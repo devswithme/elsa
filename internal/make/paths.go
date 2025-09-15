@@ -1,9 +1,10 @@
 package make
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
+
+	"go.risoftinc.com/elsa/internal/cache"
 )
 
 // gitURLToPath converts git URL to filesystem-safe path
@@ -22,13 +23,11 @@ func gitURLToPath(gitURL string) string {
 
 // getFilestubCacheDir returns the filestub cache directory for a git URL
 func getFilestubCacheDir(gitURL string) string {
-	homeDir, _ := os.UserHomeDir()
 	urlPath := gitURLToPath(gitURL)
-	return filepath.Join(homeDir, ".elsa-cache", "filestub", urlPath)
+	return filepath.Join(cache.GetFilestubCacheDir(), urlPath)
 }
 
 // getCacheDir returns the cache directory path
 func getCacheDir() string {
-	homeDir, _ := os.UserHomeDir()
-	return filepath.Join(homeDir, ".elsa-cache", "templates")
+	return cache.GetTemplatesCacheDir()
 }
