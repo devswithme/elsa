@@ -36,6 +36,10 @@
 - **Directory Exclusion**: Exclude vendor, build, and other directories
 - **Restart Delays**: Configurable delays to prevent rapid restarts
 
+**📚 For detailed documentation:**
+- **[Elsa Watch Guide (English)](ELSA-WATCH_GUIDE_EN.md)** - Complete file watching and auto-restart guide
+- **[Panduan Elsa Watch (Indonesian)](ELSA-WATCH_GUIDE_ID.md)** - Panduan lengkap pemantauan file dan auto-restart
+
 ### 📝 Elsafile - Custom Commands
 - **Custom Command Syntax**: Define custom commands for your project
 - **Command Management**: List, run, and manage custom commands
@@ -115,6 +119,10 @@ elsa watch "go run main.go"
 # Watch with custom settings
 elsa watch "go test ./..." --ext ".go,.mod" --exclude "vendor,testdata"
 ```
+
+**📚 For detailed documentation:**
+- **[Elsa Watch Guide (English)](ELSA-WATCH_GUIDE_EN.md)** - Complete file watching and auto-restart guide
+- **[Panduan Elsa Watch (Indonesian)](ELSA-WATCH_GUIDE_ID.md)** - Panduan lengkap pemantauan file dan auto-restart
 
 ### 4. Create New Project
 ```bash
@@ -202,6 +210,10 @@ elsa run test
 | `--ext <extensions>` | File extensions to watch (default: .go) |
 | `--exclude <dirs>` | Directories to exclude |
 | `--delay <duration>` | Restart delay (e.g., 500ms, 1s) |
+
+**📚 For detailed documentation:**
+- **[Elsa Watch Guide (English)](ELSA-WATCH_GUIDE_EN.md)** - Complete file watching and auto-restart guide
+- **[Panduan Elsa Watch (Indonesian)](ELSA-WATCH_GUIDE_ID.md)** - Panduan lengkap pemantauan file dan auto-restart
 
 ### Elsafile Commands
 | Command | Description |
@@ -455,12 +467,17 @@ go build -o elsa ./cmd/elsa
 ## 📚 Documentation
 
 ### Detailed Guides
-- **[Elsa Init & Run Breakdown (English)](INIT_RUN_GUIDELINE.md)** - Complete guide for init and run commands
+- **[Elsa Init & Run Breakdown](INIT_RUN_GUIDELINE.md)** - Complete guide for init and run commands
   - Command initialization and execution
   - Elsafile structure and syntax
   - Variable substitution and advanced features
   - Conflict resolution and best practices
-- **[Migration Guide](MIGRATION_GUIDE.md)** - Complete database migration management guide (English)
+- **[Elsa Watch Guide](WATCH_GUIDELINE.md)** - Complete file watching and auto-restart guide
+  - Development workflow acceleration
+  - Configuration options and best practices
+  - Troubleshooting and performance optimization
+  - Integration with development tools
+- **[Migration Guide](MIGRATION_GUIDELINE.md)** - Complete database migration management guide
   - DDL/DML separation rationale
   - Production deployment strategies
   - Best practices and troubleshooting
@@ -470,7 +487,7 @@ go build -o elsa ./cmd/elsa
   - YAML configuration
   - Advanced usage patterns
   - Troubleshooting guide
-- **[Elsa Generate Guide](GEN_GUIDELINE.md)** - Complete guide for dependency injection (English)
+- **[Elsa Generate Guide](GEN_GUIDELINE.md)** - Complete guide for dependency injection
   - Build tag system
   - Dependency definition
   - Advanced examples
