@@ -36,10 +36,6 @@
 - **Directory Exclusion**: Exclude vendor, build, and other directories
 - **Restart Delays**: Configurable delays to prevent rapid restarts
 
-**📚 For detailed documentation:**
-- **[Elsa Watch Guide (English)](ELSA-WATCH_GUIDE_EN.md)** - Complete file watching and auto-restart guide
-- **[Panduan Elsa Watch (Indonesian)](ELSA-WATCH_GUIDE_ID.md)** - Panduan lengkap pemantauan file dan auto-restart
-
 ### 📝 Elsafile - Custom Commands
 - **Custom Command Syntax**: Define custom commands for your project
 - **Command Management**: List, run, and manage custom commands
@@ -86,9 +82,6 @@ elsa init
 # This will create an Elsafile with common Go project commands
 ```
 
-**📚 For detailed documentation:**
-- **[Elsa Init & Run Breakdown (English)](docs/ELS_INIT_RUN_BREAKDOWN_EN.md)** - Complete guide for init and run commands
-
 ### 2. Database Migration
 ```bash
 # Connect to your database (interactive setup)
@@ -120,10 +113,6 @@ elsa watch "go run main.go"
 elsa watch "go test ./..." --ext ".go,.mod" --exclude "vendor,testdata"
 ```
 
-**📚 For detailed documentation:**
-- **[Elsa Watch Guide (English)](ELSA-WATCH_GUIDE_EN.md)** - Complete file watching and auto-restart guide
-- **[Panduan Elsa Watch (Indonesian)](ELSA-WATCH_GUIDE_ID.md)** - Panduan lengkap pemantauan file dan auto-restart
-
 ### 4. Create New Project
 ```bash
 # Create new project from xarch template
@@ -152,14 +141,7 @@ elsa make list
 ```
 
 **About xarch:**
-[xarch](https://github.com/risoftinc/xarch) is a Go project template that provides a clean architecture structure with:
-- Domain-driven design (DDD) pattern
-- Repository and service layers
-- HTTP handlers and middleware
-- Database integration with GORM
-- Dependency injection setup
-- Health check endpoints
-- Configuration management
+[xarch](https://github.com/risoftinc/xarch) is a Go project template that provides a clean architecture structure. For detailed information about xarch and other templates, see the [Elsa New Guide](NEW_GUIDELINE.md).
 
 ### 5. Custom Commands
 ```bash
@@ -170,9 +152,6 @@ elsa list
 elsa run build
 elsa run test
 ```
-
-**📚 For detailed documentation:**
-- **[Elsa Init & Run Breakdown (English)](docs/ELS_INIT_RUN_BREAKDOWN_EN.md)** - Complete guide for init and run commands
 
 ## 📚 Commands Reference
 
@@ -270,22 +249,14 @@ Run: `elsa generate` to create `elsa_gen.go` with automatic dependency injection
 | Command | Description |
 |---------|-------------|
 | `elsa new <template>[@version] <name>` | Create new project from template |
-| `--module, -m` | Go module name (required) |
+| `--module, -m` | Go module name (auto-generated if not provided) |
 | `--output, -o` | Output directory (default: current) |
 | `--force, -f` | Overwrite existing directory |
 | `--refresh` | Force refresh template cache |
 
-#### Project Creation Process
-The `elsa new` command follows this optimized workflow:
-1. **Clone/Update Template**: Download or refresh template from cache
-2. **Copy Template**: Copy template files to project directory
-3. **Update Module Name**: Replace module name in go.mod and all imports
-4. **Generate Proto Files**: Generate Go files from .proto files (if present)
-5. **Download Dependencies**: Run `go mod download` to fetch all dependencies
-6. **Tidy Dependencies**: Run `go mod tidy` to clean and optimize dependencies
-7. **Clean Git History**: Remove template git history for fresh start
-
-This ensures your new project is ready to run immediately with all dependencies properly resolved.
+**📚 For detailed documentation:**
+- **[Elsa New Guide (English)](ELSA-NEW_GUIDE_EN.md)** - Complete guide for creating new projects from templates
+- **[Panduan Elsa New (Indonesian)](ELSA-NEW_GUIDE_ID.md)** - Panduan lengkap membuat proyek baru dari template
 
 ### Make Commands
 | Command | Description |
@@ -477,6 +448,11 @@ go build -o elsa ./cmd/elsa
   - Configuration options and best practices
   - Troubleshooting and performance optimization
   - Integration with development tools
+- **[Elsa New Guide](NEW_GUIDELINE.md)** - Complete guide for creating new projects from templates
+  - Template management and caching
+  - Project creation process
+  - Available templates (xarch)
+  - Advanced features and troubleshooting
 - **[Migration Guide](MIGRATION_GUIDELINE.md)** - Complete database migration management guide
   - DDL/DML separation rationale
   - Production deployment strategies
