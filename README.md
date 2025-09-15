@@ -235,9 +235,6 @@ var HandlerSet = elsa.Set(NewUserHandler)
 
 Run: `elsa generate` to create `elsa_gen.go` with automatic dependency injection.
 
-**📚 For complete documentation:**
-- **[English Guide](elsa-generate-guide.md)** - Complete dependency injection guide
-
 ### New Project Commands
 | Command | Description |
 |---------|-------------|
