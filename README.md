@@ -125,6 +125,9 @@ elsa new xarch@v1.2.3 my-api --module "github.com/username/my-api"
 elsa new xarch my-api --module "github.com/username/my-api" --output "./projects"
 ```
 
+**About xarch:**
+[xarch](https://github.com/risoftinc/xarch) is a Go project template that provides a clean architecture structure. For detailed information about xarch and other templates, see the [Elsa New Guide](NEW_GUIDELINE.md).
+
 ### 5. Generate Files with Make
 ```bash
 # Generate repository
@@ -139,9 +142,6 @@ elsa make repository health/health_repository
 # List available template types
 elsa make list
 ```
-
-**About xarch:**
-[xarch](https://github.com/risoftinc/xarch) is a Go project template that provides a clean architecture structure. For detailed information about xarch and other templates, see the [Elsa New Guide](NEW_GUIDELINE.md).
 
 ### 5. Custom Commands
 ```bash
