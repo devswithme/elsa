@@ -24,11 +24,11 @@
 ## 🚀 Key Features
 
 ### 📊 Database Migration Management
-- **DDL Migrations**: Schema changes, table creation, modifications
-- **DML Migrations**: Data seeding, updates, and transformations
+- **DDL/DML Separation**: Organized schema and data changes for production safety
 - **Multi Database Support**: MySQL, PostgreSQL, SQLite
 - **Migration Status Tracking**: View applied, pending, and rollback status
-- **Sequential & Timestamp Formats**: Flexible migration naming formats
+- **Flexible Naming**: Sequential or timestamp-based migration IDs
+- **Production Ready**: Safe deployment with independent rollback control
 
 ### 👀 File Watching & Auto-Restart
 - **Smart File Monitoring**: Watch Go files and auto-restart on changes
@@ -84,14 +84,21 @@ elsa init
 
 ### 2. Database Migration
 ```bash
-# Connect to your database
+# Connect to your database (interactive setup)
 elsa migration connect
 
-# Create new DDL migration
+# Or use direct connection string
+elsa migration connect -c "mysql://user:password@localhost:3306/database"
+
+# Create new DDL migration (schema changes)
 elsa migration create ddl create_users_table
+
+# Create new DML migration (data changes)
+elsa migration create dml seed_users_data
 
 # Apply migrations
 elsa migration up ddl
+elsa migration up dml
 
 # Check migration status
 elsa migration status
@@ -175,6 +182,12 @@ elsa run test
 **Migration Types:**
 - `ddl`: Data Definition Language (schema changes, table creation, modifications)
 - `dml`: Data Manipulation Language (data seeding, updates, transformations)
+
+**Why DDL/DML Separation?**
+- **Production Safety**: Deploy schema and data changes independently
+- **Rollback Control**: Rollback schema and data changes separately
+- **Environment Consistency**: Schema changes apply consistently, data changes can be environment-specific
+- **Team Collaboration**: Different team members can work on schema vs. data changes
 
 ### Watch Commands
 | Command | Description |
@@ -382,22 +395,36 @@ fmt:
 ```
 
 ### Database Configuration
-Elsa supports multiple database drivers:
+Elsa supports multiple connection methods:
 
-#### MySQL
+#### Connection Priority Order
+1. `-c` flag (highest priority)
+2. `MIGRATE_CONNECTION` environment variable
+3. `.env` file with `MIGRATE_CONNECTION` key
+4. Individual database environment variables
+
+#### Connection Examples
 ```bash
+# Interactive setup (creates/updates .env file)
+elsa migration connect
+
+# Direct connection string
 elsa migration connect -c "mysql://user:password@localhost:3306/database"
-```
-
-#### PostgreSQL
-```bash
 elsa migration connect -c "postgres://user:password@localhost:5432/database"
+elsa migration connect -c "sqlite://database.db"
+
+# Environment variable
+export MIGRATE_CONNECTION="mysql://user:password@localhost:3306/database"
+elsa migration up ddl
 ```
 
-#### SQLite
-```bash
-elsa migration connect -c "sqlite://database.db"
+#### .env File
+```env
+# Single connection string (recommended)
+MIGRATE_CONNECTION=mysql://user:password@localhost:3306/database
 ```
+
+**Note**: When using `elsa migration connect` interactively, even if you input individual database details, the system automatically converts them to `MIGRATE_CONNECTION` format and saves it to `.env` file.
 
 ## 📁 Project Structure
 
@@ -458,6 +485,11 @@ go build -o elsa ./cmd/elsa
 ## 📚 Documentation
 
 ### Detailed Guides
+- **[Migration Guide](MIGRATION_GUIDE.md)** - Complete database migration management guide (English)
+  - DDL/DML separation rationale
+  - Production deployment strategies
+  - Best practices and troubleshooting
+  - CI/CD integration examples
 - **[Make System Guideline](MAKE_GUIDELINE.md)** - Complete guide for `elsa make` system
   - Template development
   - YAML configuration
