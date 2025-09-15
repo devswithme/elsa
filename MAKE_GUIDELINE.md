@@ -573,8 +573,6 @@ EOF
 # Create YAML config
 cat > .elsa-config.yaml << 'EOF'
 source:
-  name: my-template
-  version: v1.0.0
   git_url: https://github.com/risoftinc/xarch
   git_commit: abc123
 
