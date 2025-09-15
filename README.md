@@ -24,11 +24,11 @@
 ## 🚀 Key Features
 
 ### 📊 Database Migration Management
-- **DDL Migrations**: Schema changes, table creation, modifications
-- **DML Migrations**: Data seeding, updates, and transformations
+- **DDL/DML Separation**: Organized schema and data changes for production safety
 - **Multi Database Support**: MySQL, PostgreSQL, SQLite
 - **Migration Status Tracking**: View applied, pending, and rollback status
-- **Sequential & Timestamp Formats**: Flexible migration naming formats
+- **Flexible Naming**: Sequential or timestamp-based migration IDs
+- **Production Ready**: Safe deployment with independent rollback control
 
 ### 👀 File Watching & Auto-Restart
 - **Smart File Monitoring**: Watch Go files and auto-restart on changes
@@ -84,14 +84,21 @@ elsa init
 
 ### 2. Database Migration
 ```bash
-# Connect to your database
+# Connect to your database (interactive setup)
 elsa migration connect
 
-# Create new DDL migration
+# Or use direct connection string
+elsa migration connect -c "mysql://user:password@localhost:3306/database"
+
+# Create new DDL migration (schema changes)
 elsa migration create ddl create_users_table
+
+# Create new DML migration (data changes)
+elsa migration create dml seed_users_data
 
 # Apply migrations
 elsa migration up ddl
+elsa migration up dml
 
 # Check migration status
 elsa migration status
@@ -118,6 +125,9 @@ elsa new xarch@v1.2.3 my-api --module "github.com/username/my-api"
 elsa new xarch my-api --module "github.com/username/my-api" --output "./projects"
 ```
 
+**About xarch:**
+[xarch](https://github.com/risoftinc/xarch) is a Go project template that provides a clean architecture structure. For detailed information about xarch and other templates, see the [Elsa New Guide](NEW_GUIDELINE.md).
+
 ### 5. Generate Files with Make
 ```bash
 # Generate repository
@@ -132,16 +142,6 @@ elsa make repository health/health_repository
 # List available template types
 elsa make list
 ```
-
-**About xarch:**
-[xarch](https://github.com/risoftinc/xarch) is a Go project template that provides a clean architecture structure with:
-- Domain-driven design (DDD) pattern
-- Repository and service layers
-- HTTP handlers and middleware
-- Database integration with GORM
-- Dependency injection setup
-- Health check endpoints
-- Configuration management
 
 ### 5. Custom Commands
 ```bash
@@ -176,6 +176,12 @@ elsa run test
 - `ddl`: Data Definition Language (schema changes, table creation, modifications)
 - `dml`: Data Manipulation Language (data seeding, updates, transformations)
 
+**Why DDL/DML Separation?**
+- **Production Safety**: Deploy schema and data changes independently
+- **Rollback Control**: Rollback schema and data changes separately
+- **Environment Consistency**: Schema changes apply consistently, data changes can be environment-specific
+- **Team Collaboration**: Different team members can work on schema vs. data changes
+
 ### Watch Commands
 | Command | Description |
 |---------|-------------|
@@ -183,6 +189,10 @@ elsa run test
 | `--ext <extensions>` | File extensions to watch (default: .go) |
 | `--exclude <dirs>` | Directories to exclude |
 | `--delay <duration>` | Restart delay (e.g., 500ms, 1s) |
+
+**📚 For detailed documentation:**
+- **[Elsa Watch Guide (English)](ELSA-WATCH_GUIDE_EN.md)** - Complete file watching and auto-restart guide
+- **[Panduan Elsa Watch (Indonesian)](ELSA-WATCH_GUIDE_ID.md)** - Panduan lengkap pemantauan file dan auto-restart
 
 ### Elsafile Commands
 | Command | Description |
@@ -192,44 +202,8 @@ elsa run test
 | `elsa list --conflicts` | Show conflicting commands |
 | `elsa run <command>` | Execute custom command |
 
-#### Advanced Elsafile Features
-
-**Variable Substitution**
-- Environment variables: `$VAR`, `${VAR}`
-- Interactive input: `${?VAR:prompt}`, `${?VAR}`
-- Quote handling: Supports both single and double quotes
-- Line continuation: Use `\` for multi-line commands
-
-**Example Elsafile with Advanced Features:**
-```bash
-# Environment variables (these variables exist in the environment)
-test-env:
-	echo "User: $USER"
-	echo "Path: ${PATH}"
-
-# Interactive input
-# PRIORITY: Check OS environment first, if exists use environment value (NO prompt)
-# If not in environment, then prompt user for manual input
-migration-create:
-	elsa migration create ddl ${?MIGRATION_NAME:Enter migration name}
-
-# Multi-line commands with backslash continuation
-complex-setup:
-	echo "Setting up project: ${?PROJECT_NAME:Enter project name}" && \
-	mkdir ${?PROJECT_NAME} && \
-	cd ${?PROJECT_NAME} && \
-	echo "Description: ${?DESCRIPTION:Enter description}"
-
-# Mixed variables
-test-mixed:
-	echo "User: $USER"  # Environment variable
-	echo "Migration: ${?MIGRATION_NAME:Enter migration name}"  
-	echo "Custom: ${?CUSTOM_VAR:Enter custom value}"  
-```
-
-**Variable Substitution Priority:**
-1. **Environment variables** (if already set)
-2. **Interactive input** (if not in environment)
+**📚 For detailed documentation:**
+- **[Elsa Init & Run Breakdown (English)](docs/ELS_INIT_RUN_BREAKDOWN_EN.md)** - Complete guide for init and run commands with advanced features
 
 ### Generate Commands
 | Command | Description |
@@ -237,9 +211,9 @@ test-mixed:
 | `elsa generate` | Generate dependency injection code |
 | `elsa gen` | Short alias for generate |
 
-#### Dependency Injection Example
+#### Quick Example
 
-Create a file with `//go:build elsabuild` tag (e.g., `dep_manager.go`):
+Create a file with `//go:build elsabuild` tag:
 
 ```go
 //go:build elsabuild
@@ -257,75 +231,32 @@ type Dependencies struct {
 }
 
 func InitializeHandler(db *gorm.DB) *Dependencies {
-    elsa.Generate(
-        RepositorySet,
-        ServicesSet,
-        HandlerSet,
-    )
+    elsa.Generate(RepositorySet, ServiceSet, HandlerSet)
     return nil
 }
 
-var RepositorySet = elsa.Set(
-    NewUserRepository,
-)
-
-var ServicesSet = elsa.Set(
-    NewUserService,
-)
-
-var HandlerSet = elsa.Set(
-    NewUserHandler,
-)
+var RepositorySet = elsa.Set(NewUserRepository)
+var ServiceSet = elsa.Set(NewUserService)
+var HandlerSet = elsa.Set(NewUserHandler)
 ```
 
-Run the generate command:
-```bash
-elsa generate
-```
+Run: `elsa generate` to create `elsa_gen.go` with automatic dependency injection.
 
-This will create `elsa_gen.go` with the generated dependency injection code:
-
-```go
-// Code generated by Elsa. DO NOT EDIT.
-
-//go:generate go run -mod=mod go.risoftinc.com/elsa/cmd/elsa gen
-//go:build !elsabuild
-// +build !elsabuild
-
-package http
-
-func InitializeHandler(db *gorm.DB) *Dependencies {
-    userRepo := NewUserRepository(db)
-    userSvc := NewUserService(userRepo)
-    userHandler := NewUserHandler(userSvc)
-
-    elsa.Generate(userRepo, userSvc, userHandler)
-    return &Dependencies{
-        UserHandler: userHandler,
-    }
-}
-```
+**📚 For complete documentation:**
+- **[English Guide](elsa-generate-guide.md)** - Complete dependency injection guide
 
 ### New Project Commands
 | Command | Description |
 |---------|-------------|
 | `elsa new <template>[@version] <name>` | Create new project from template |
-| `--module, -m` | Go module name (required) |
+| `--module, -m` | Go module name (auto-generated if not provided) |
 | `--output, -o` | Output directory (default: current) |
 | `--force, -f` | Overwrite existing directory |
 | `--refresh` | Force refresh template cache |
 
-#### Project Creation Process
-The `elsa new` command follows this optimized workflow:
-1. **Clone/Update Template**: Download or refresh template from cache
-2. **Copy Template**: Copy template files to project directory
-3. **Update Module Name**: Replace module name in go.mod and all imports
-4. **Generate Proto Files**: Generate Go files from .proto files (if present)
-5. **Download Dependencies**: Run `go mod download` to fetch all dependencies
-6. **Tidy Dependencies**: Run `go mod tidy` to clean and optimize dependencies
-7. **Clean Git History**: Remove template git history for fresh start
-
-This ensures your new project is ready to run immediately with all dependencies properly resolved.
+**📚 For detailed documentation:**
+- **[Elsa New Guide (English)](ELSA-NEW_GUIDE_EN.md)** - Complete guide for creating new projects from templates
+- **[Panduan Elsa New (Indonesian)](ELSA-NEW_GUIDE_ID.md)** - Panduan lengkap membuat proyek baru dari template
 
 ### Make Commands
 | Command | Description |
@@ -417,22 +348,36 @@ fmt:
 ```
 
 ### Database Configuration
-Elsa supports multiple database drivers:
+Elsa supports multiple connection methods:
 
-#### MySQL
+#### Connection Priority Order
+1. `-c` flag (highest priority)
+2. `MIGRATE_CONNECTION` environment variable
+3. `.env` file with `MIGRATE_CONNECTION` key
+4. Individual database environment variables
+
+#### Connection Examples
 ```bash
+# Interactive setup (creates/updates .env file)
+elsa migration connect
+
+# Direct connection string
 elsa migration connect -c "mysql://user:password@localhost:3306/database"
-```
-
-#### PostgreSQL
-```bash
 elsa migration connect -c "postgres://user:password@localhost:5432/database"
+elsa migration connect -c "sqlite://database.db"
+
+# Environment variable
+export MIGRATE_CONNECTION="mysql://user:password@localhost:3306/database"
+elsa migration up ddl
 ```
 
-#### SQLite
-```bash
-elsa migration connect -c "sqlite://database.db"
+#### .env File
+```env
+# Single connection string (recommended)
+MIGRATE_CONNECTION=mysql://user:password@localhost:3306/database
 ```
+
+**Note**: When using `elsa migration connect` interactively, even if you input individual database details, the system automatically converts them to `MIGRATE_CONNECTION` format and saves it to `.env` file.
 
 ## 📁 Project Structure
 
@@ -493,11 +438,36 @@ go build -o elsa ./cmd/elsa
 ## 📚 Documentation
 
 ### Detailed Guides
+- **[Elsa Init & Run Breakdown](INIT_RUN_GUIDELINE.md)** - Complete guide for init and run commands
+  - Command initialization and execution
+  - Elsafile structure and syntax
+  - Variable substitution and advanced features
+  - Conflict resolution and best practices
+- **[Elsa Watch Guide](WATCH_GUIDELINE.md)** - Complete file watching and auto-restart guide
+  - Development workflow acceleration
+  - Configuration options and best practices
+  - Troubleshooting and performance optimization
+  - Integration with development tools
+- **[Elsa New Guide](NEW_GUIDELINE.md)** - Complete guide for creating new projects from templates
+  - Template management and caching
+  - Project creation process
+  - Available templates (xarch)
+  - Advanced features and troubleshooting
+- **[Migration Guide](MIGRATION_GUIDELINE.md)** - Complete database migration management guide
+  - DDL/DML separation rationale
+  - Production deployment strategies
+  - Best practices and troubleshooting
+  - CI/CD integration examples
 - **[Make System Guideline](MAKE_GUIDELINE.md)** - Complete guide for `elsa make` system
   - Template development
   - YAML configuration
   - Advanced usage patterns
   - Troubleshooting guide
+- **[Elsa Generate Guide](GEN_GUIDELINE.md)** - Complete guide for dependency injection
+  - Build tag system
+  - Dependency definition
+  - Advanced examples
+  - Troubleshooting and best practices
 
 ### Command Reference
 - `elsa --help` - General help
