@@ -82,6 +82,9 @@ elsa init
 # This will create an Elsafile with common Go project commands
 ```
 
+**📚 For detailed documentation:**
+- **[Elsa Init & Run Breakdown (English)](docs/ELS_INIT_RUN_BREAKDOWN_EN.md)** - Complete guide for init and run commands
+
 ### 2. Database Migration
 ```bash
 # Connect to your database (interactive setup)
@@ -160,6 +163,9 @@ elsa run build
 elsa run test
 ```
 
+**📚 For detailed documentation:**
+- **[Elsa Init & Run Breakdown (English)](docs/ELS_INIT_RUN_BREAKDOWN_EN.md)** - Complete guide for init and run commands
+
 ## 📚 Commands Reference
 
 ### Root Commands
@@ -205,44 +211,8 @@ elsa run test
 | `elsa list --conflicts` | Show conflicting commands |
 | `elsa run <command>` | Execute custom command |
 
-#### Advanced Elsafile Features
-
-**Variable Substitution**
-- Environment variables: `$VAR`, `${VAR}`
-- Interactive input: `${?VAR:prompt}`, `${?VAR}`
-- Quote handling: Supports both single and double quotes
-- Line continuation: Use `\` for multi-line commands
-
-**Example Elsafile with Advanced Features:**
-```bash
-# Environment variables (these variables exist in the environment)
-test-env:
-	echo "User: $USER"
-	echo "Path: ${PATH}"
-
-# Interactive input
-# PRIORITY: Check OS environment first, if exists use environment value (NO prompt)
-# If not in environment, then prompt user for manual input
-migration-create:
-	elsa migration create ddl ${?MIGRATION_NAME:Enter migration name}
-
-# Multi-line commands with backslash continuation
-complex-setup:
-	echo "Setting up project: ${?PROJECT_NAME:Enter project name}" && \
-	mkdir ${?PROJECT_NAME} && \
-	cd ${?PROJECT_NAME} && \
-	echo "Description: ${?DESCRIPTION:Enter description}"
-
-# Mixed variables
-test-mixed:
-	echo "User: $USER"  # Environment variable
-	echo "Migration: ${?MIGRATION_NAME:Enter migration name}"  
-	echo "Custom: ${?CUSTOM_VAR:Enter custom value}"  
-```
-
-**Variable Substitution Priority:**
-1. **Environment variables** (if already set)
-2. **Interactive input** (if not in environment)
+**📚 For detailed documentation:**
+- **[Elsa Init & Run Breakdown (English)](docs/ELS_INIT_RUN_BREAKDOWN_EN.md)** - Complete guide for init and run commands with advanced features
 
 ### Generate Commands
 | Command | Description |
@@ -485,6 +455,11 @@ go build -o elsa ./cmd/elsa
 ## 📚 Documentation
 
 ### Detailed Guides
+- **[Elsa Init & Run Breakdown (English)](INIT_RUN_GUIDELINE.md)** - Complete guide for init and run commands
+  - Command initialization and execution
+  - Elsafile structure and syntax
+  - Variable substitution and advanced features
+  - Conflict resolution and best practices
 - **[Migration Guide](MIGRATION_GUIDE.md)** - Complete database migration management guide (English)
   - DDL/DML separation rationale
   - Production deployment strategies

@@ -479,7 +479,7 @@ elsa migration refresh dml
 If migrations are in an inconsistent state:
 
 1. **BACKUP FIRST**: Create a full database backup
-2. Check migration table: `SELECT * FROM elsa_migrations;`
+2. Check migration table: `SELECT * FROM migrations;`
 3. Manually remove problematic records
 4. Fix database schema manually
 5. Update migration status accordingly
@@ -488,7 +488,7 @@ If migrations are in an inconsistent state:
 
 ## 📊 Migration Tracking
 
-Elsa automatically tracks migrations in the `elsa_migrations` table:
+Elsa automatically tracks migrations in the `migrations` table:
 
 | Column | Type | Description |
 |--------|------|-------------|
