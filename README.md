@@ -190,10 +190,6 @@ elsa run test
 | `--exclude <dirs>` | Directories to exclude |
 | `--delay <duration>` | Restart delay (e.g., 500ms, 1s) |
 
-**📚 For detailed documentation:**
-- **[Elsa Watch Guide (English)](ELSA-WATCH_GUIDE_EN.md)** - Complete file watching and auto-restart guide
-- **[Panduan Elsa Watch (Indonesian)](ELSA-WATCH_GUIDE_ID.md)** - Panduan lengkap pemantauan file dan auto-restart
-
 ### Elsafile Commands
 | Command | Description |
 |---------|-------------|
@@ -201,9 +197,6 @@ elsa run test
 | `elsa list` | List all commands |
 | `elsa list --conflicts` | Show conflicting commands |
 | `elsa run <command>` | Execute custom command |
-
-**📚 For detailed documentation:**
-- **[Elsa Init & Run Breakdown (English)](docs/ELS_INIT_RUN_BREAKDOWN_EN.md)** - Complete guide for init and run commands with advanced features
 
 ### Generate Commands
 | Command | Description |
@@ -253,10 +246,6 @@ Run: `elsa generate` to create `elsa_gen.go` with automatic dependency injection
 | `--output, -o` | Output directory (default: current) |
 | `--force, -f` | Overwrite existing directory |
 | `--refresh` | Force refresh template cache |
-
-**📚 For detailed documentation:**
-- **[Elsa New Guide (English)](ELSA-NEW_GUIDE_EN.md)** - Complete guide for creating new projects from templates
-- **[Panduan Elsa New (Indonesian)](ELSA-NEW_GUIDE_ID.md)** - Panduan lengkap membuat proyek baru dari template
 
 ### Make Commands
 | Command | Description |
