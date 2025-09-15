@@ -3,36 +3,15 @@ package new
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"time"
 
 	"go.risoftinc.com/elsa/constants"
+	"go.risoftinc.com/elsa/internal/cache"
 )
 
 // getCacheDir returns the appropriate cache directory for the current platform
 func getCacheDir() string {
-	// Get user home directory
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		// Fallback to current directory if home directory is not accessible
-		homeDir = "."
-	}
-
-	// Platform-specific cache directory
-	switch runtime.GOOS {
-	case "windows":
-		// Windows: %USERPROFILE%\.elsa-cache\templates
-		return filepath.Join(homeDir, constants.NewCacheDirName, constants.NewTemplatesDir)
-	case "darwin":
-		// macOS: ~/Library/Caches/elsa/templates
-		return filepath.Join(homeDir, "Library", "Caches", "elsa", constants.NewTemplatesDir)
-	case "linux":
-		// Linux: ~/.cache/elsa/templates
-		return filepath.Join(homeDir, ".cache", "elsa", constants.NewTemplatesDir)
-	default:
-		// Fallback for other platforms
-		return filepath.Join(homeDir, ".elsa-cache", constants.NewTemplatesDir)
-	}
+	return cache.GetTemplatesCacheDir()
 }
 
 // GetCacheDir returns the cache directory path
