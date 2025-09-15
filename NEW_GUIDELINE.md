@@ -134,6 +134,7 @@ xarch/
 - **Repository Pattern**: Interface for data access
 - **Service Layer**: Business logic abstraction
 - **HTTP Handlers**: REST API endpoints
+- **gRPC Support**: High-performance RPC services
 - **Middleware Support**: Request/response processing
 - **Database Integration**: GORM integration
 - **Dependency Injection**: Clean dependency management
@@ -143,8 +144,11 @@ xarch/
 #### 🛠️ Technologies Used
 - **Go 1.21+**: Language runtime
 - **GORM**: ORM for database operations
-- **Gin**: HTTP web framework
-- **Viper**: Configuration management
+- **Echo**: HTTP web framework
+- **GoEnv**: Configuration management
+- **GoResponse**: Standard Response management
+- **GoLogger**: Standard Logger
+- **gRPC**: High-performance RPC framework
 - **JWT**: Authentication support
 - **Bcrypt**: Password hashing
 - **Validator**: Input validation
