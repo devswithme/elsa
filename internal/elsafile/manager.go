@@ -194,6 +194,9 @@ func (em *Manager) ExecuteShellCommand(command string) error {
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 
+	// Inherit all environment variables including those set by os.Setenv()
+	cmd.Env = os.Environ()
+
 	if err := cmd.Run(); err != nil {
 		fmt.Println(err.Error())
 	}
