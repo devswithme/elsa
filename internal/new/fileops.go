@@ -63,9 +63,22 @@ func (tm *TemplateManager) copyDirectory(src, dst string, excludeDirs []string) 
 			return err
 		}
 
+		// Check if the file is in the excepted list
+		excepted := func() bool {
+			for _, expected := range []string{
+				".gitignore",
+				".gitkeep",
+			} {
+				if strings.Contains(path, expected) {
+					return true
+				}
+			}
+			return false
+		}()
+
 		// Skip excluded directories
 		for _, excludeDir := range excludeDirs {
-			if strings.Contains(path, excludeDir) {
+			if strings.Contains(path, excludeDir) && !excepted {
 				if info.IsDir() {
 					return filepath.SkipDir
 				}
