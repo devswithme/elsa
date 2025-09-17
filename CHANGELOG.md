@@ -12,13 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Features
 - 
 
-## [1.0.1] - 2025-09-17
+## [1.0.2] - 2025-09-17
 
-### Fixed
-- **Migration SQL Parser**: Fixed PostgreSQL dollar-quoted string parsing in migration execution
-  - Improved SQL statement splitting to properly handle `$$` and custom dollar-quoted strings
-  - Resolved "unterminated dollar-quoted string" errors during migration execution
-  - Enhanced parser to ignore semicolons within dollar-quoted function bodies
-
-- **Project Template Copying**: Fixed hidden files not being copied during project creation
-  - Ensures `.gitignore`, `.gitkeep`, and other hidden files are properly copied from templates
+### Features
+- **Improved Command Execution**: Enhanced `elsa run` command to handle single-line multi-command execution
+  - Commands with `&&` operators are now executed as single shell commands instead of separate executions
+  - Supports both single-line (`cd myapp && go run .`) and multi-line with backslash continuation
+  - Maintains backward compatibility with existing separate command execution
+  - Examples:
+    - `cd myapp && go run .` - executes as single shell command
+    - `echo "Setting up project" && \ mkdir project && cd project` - executes as single shell command
+    - `cd myapp` followed by `go run .` - executes as separate commands (legacy behavior)

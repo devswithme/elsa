@@ -151,7 +151,13 @@ func (em *Manager) ExecuteCommand(name string) error {
 	fmt.Printf("%s Running Elsafile command: %s\n", constants.RocketEmoji, name)
 	fmt.Printf("%s Executing: %s\n\n", constants.PencilEmoji, strings.Join(command.Commands, constants.CommandSeparator))
 
-	// Execute each command sequentially
+	// Check if we have a single command that contains && (should be executed as single shell command)
+	if len(command.Commands) == 1 && strings.Contains(command.Commands[0], "&&") {
+		// Execute as single shell command
+		return em.ExecuteShellCommand(command.Commands[0])
+	}
+
+	// Execute each command sequentially (legacy behavior)
 	for _, cmd := range command.Commands {
 		if err := em.ExecuteShellCommand(cmd); err != nil {
 			return err
@@ -240,7 +246,15 @@ func (em *Manager) GetConflictingCommands() []string {
 }
 
 // parseCommandLine parses a command line, handling quoted strings properly
+// It detects whether commands should be executed as a single shell command or separately
 func parseCommandLine(line string) []string {
+	// Check if the line contains && - if so, treat as single shell command
+	if strings.Contains(line, "&&") {
+		// Return the entire line as a single command to be executed by shell
+		return []string{strings.TrimSpace(line)}
+	}
+	
+	// For lines without &&, parse as separate commands (legacy behavior)
 	var commands []string
 	var current strings.Builder
 	var inQuotes bool
