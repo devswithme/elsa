@@ -131,18 +131,76 @@ func (me *MigrationExecutor) ExecuteMigration(sqlContent string, migrationType s
 
 // splitSQLStatements splits SQL content into individual statements
 func splitSQLStatements(sqlContent string) []string {
-	// Simple split by semicolon - in production you might want more sophisticated parsing
-	statements := strings.Split(sqlContent, ";")
+	var statements []string
+	var currentStatement strings.Builder
+	var inDollarQuote bool
+	var dollarTag string
 
-	var result []string
-	for _, stmt := range statements {
-		stmt = strings.TrimSpace(stmt)
-		if stmt != "" {
-			result = append(result, stmt)
+	lines := strings.Split(sqlContent, "\n")
+
+	for _, line := range lines {
+		line = strings.TrimRight(line, " \t\r")
+
+		// Check for dollar-quoted strings
+		if !inDollarQuote {
+			// Look for start of dollar quote
+			if idx := strings.Index(line, "$$"); idx != -1 {
+				dollarTag = "$$"
+				inDollarQuote = true
+				currentStatement.WriteString(line)
+				currentStatement.WriteString("\n")
+				continue
+			}
+			// Look for custom dollar quote tags like $tag$
+			if idx := strings.Index(line, "$"); idx != -1 {
+				// Find the end of the tag
+				for i := idx + 1; i < len(line); i++ {
+					if line[i] == '$' {
+						dollarTag = line[idx : i+1]
+						inDollarQuote = true
+						currentStatement.WriteString(line)
+						currentStatement.WriteString("\n")
+						break
+					}
+				}
+				if inDollarQuote {
+					continue
+				}
+			}
+		} else {
+			// We're inside a dollar quote, look for the end
+			if strings.Contains(line, dollarTag) {
+				inDollarQuote = false
+				dollarTag = ""
+			}
+			currentStatement.WriteString(line)
+			currentStatement.WriteString("\n")
+			continue
+		}
+
+		// Regular line processing
+		currentStatement.WriteString(line)
+		currentStatement.WriteString("\n")
+
+		// Check if this line ends with semicolon (and we're not in a dollar quote)
+		if strings.HasSuffix(strings.TrimSpace(line), ";") {
+			stmt := strings.TrimSpace(currentStatement.String())
+			if stmt != "" {
+				statements = append(statements, stmt)
+			}
+			currentStatement.Reset()
 		}
 	}
 
-	return result
+	// Handle any remaining statement
+	if currentStatement.Len() > 0 {
+		stmt := strings.TrimSpace(currentStatement.String())
+		if stmt != "" {
+			statements = append(statements, stmt)
+		}
+	}
+
+	return statements
 }
 
 // GetMigrationChecksum calculates a simple checksum for migration content
