@@ -70,7 +70,7 @@ func (me *MigrationExecutor) EnsureMigrationTable() error {
 // GetAppliedMigrations retrieves all applied migrations
 func (me *MigrationExecutor) GetAppliedMigrations(migrationType string) ([]string, error) {
 	var records []MigrationRecord
-	if err := me.db.Where(constants.TypeField+" = ?", migrationType).Find(&records).Error; err != nil {
+	if err := me.db.Where(constants.TypeField+" = ?", migrationType).Order(constants.AppliedAtField + " DESC").Find(&records).Error; err != nil {
 		return nil, fmt.Errorf(constants.ErrFailedGetMigrations, err)
 	}
 

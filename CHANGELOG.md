@@ -12,14 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Features
 - 
 
-## [1.0.2] - 2025-09-17
+## [1.0.3] - 2025-09-18
 
-### Features
-- **Improved Command Execution**: Enhanced `elsa run` command to handle single-line multi-command execution
-  - Commands with `&&` operators are now executed as single shell commands instead of separate executions
-  - Supports both single-line (`cd myapp && go run .`) and multi-line with backslash continuation
-  - Maintains backward compatibility with existing separate command execution
-  - Examples:
-    - `cd myapp && go run .` - executes as single shell command
-    - `echo "Setting up project" && \ mkdir project && cd project` - executes as single shell command
-    - `cd myapp` followed by `go run .` - executes as separate commands (legacy behavior)
+### Fixed
+- **Fixed Migration Refresh Ordering**: Fixed migration refresh command to properly order rollback operations
+  - Migration rollback now executes in reverse chronological order (newest to oldest)
+  - Ensures proper dependency handling during migration refresh operations
+  - Prevents potential errors when migrations have dependencies on each other
+  - Consistent with migration down command behavior
